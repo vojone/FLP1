@@ -2,8 +2,8 @@ import System.Environment
 
 data Task =
     Help |
-    Classification !String !String |
-    Training !String 
+    Classification String String |
+    Training String
     deriving (Show, Eq)
 
 data Config = Config {
