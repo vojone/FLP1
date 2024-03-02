@@ -1,5 +1,5 @@
 BIN_NAME = flp-fun
-SOURCES = flp-fun.hs
+SOURCES = ArgumentParser.hs main.hs
 INZIP = Makefile README.md $(SOURCES)
 ZIP_NAME = xdvora3o.zip
 
@@ -10,10 +10,11 @@ FLAGS = -Wall
 
 .PHONY:\
 	zip\
-	clean
+	clean\
+	hi
 
-%.o: %.hs
-	$(COMPILER) $< -c $@ $(FLAGS)
+%.o: %.hs hi
+	$(COMPILER) $< -c $(FLAGS)
 
 $(BIN_NAME): $(OBJS)
 	$(COMPILER) $(OBJS) -o $@ $(FLAGS)
@@ -26,3 +27,6 @@ zip:
 
 clean:
 	rm -f *.o *.hi $(BIN_NAME) $(ZIP_NAME)
+
+hi:
+	ghc -fno-code -fwrite-interface $(SOURCES)

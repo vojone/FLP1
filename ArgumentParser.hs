@@ -1,4 +1,9 @@
-import System.Environment
+module ArgumentParser
+(
+    Task,
+    Config,
+    parseArgs,
+) where
 
 data Task =
     Help |
@@ -34,17 +39,9 @@ parseArg (Config t) arg args
 parseArgs :: [String] -> Config
 parseArgs [] = configDefault
 parseArgs args =
-    let parseArgs' :: Config -> [String] -> Config
-        parseArgs' config [] = config
-        parseArgs' config (arg:tail) = uncurry parseArgs' $ parseArg config arg tail
+    let parseRemainingArgs :: Config -> [String] -> Config
+        parseRemainingArgs config [] = config
+        parseRemainingArgs config (arg:argstail) = uncurry parseRemainingArgs $ parseArg config arg argstail
     in if (elem "-h" args) || (elem "--help" args)
         then Config Help
-        else parseArgs' configDefault args
-
-
-
-main :: IO ()
-main = do
-    args <- getArgs
-    let config = parseArgs args
-    putStrLn ("Config: " ++ (show config))
+        else parseRemainingArgs configDefault args
