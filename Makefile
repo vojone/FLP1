@@ -18,6 +18,9 @@ FLAGS = -Wall
 $(BIN_NAME): $(OBJS)
 	$(COMPILER) $(OBJS) -o $@ $(FLAGS)
 
+run:
+	$(BIN_NAME)
+
 zip:
 	zip $(ZIP_NAME) $(INZIP)
 
