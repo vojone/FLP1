@@ -28,14 +28,6 @@ skipNewline (c1:c2:str)
     | c1 == '\r' && c2 == '\n' = str
     | otherwise = c1:c2:str
 
--- isIndentation = ("  " ==)
--- isNode = ("Node" ==)
--- isLeaf = ("Leaf" ==)
--- isColon = (":" ==)
--- isComma = ("," ==)
--- isInt = (\s -> foldl isDigit False s)
-
--- init :: String -> String ->
 
 data ParserState =
     Init |
@@ -140,11 +132,14 @@ parseLine str' =
 
 toTreeLine :: [Token] -> DecisionTreeLine
 toTreeLine tokens = initializeLine (getLineInit tokens) tokens where
+    getLineInit :: [Token] -> DecisionTreeLine
     getLineInit = foldl (\a t -> if a == None then getLineInit' t else a) None
+    getLineInit' :: Token -> DecisionTreeLine
     getLineInit' (Token ttype _) = case ttype of
         NodeToken -> NodeLine 0 0 0.0
         LeafToken -> LeafLine 0 ""
         _ -> None
+    initializeLine :: DecisionTreeLine -> [Token] -> DecisionTreeLine
     initializeLine None [] = None
     initializeLine tline [] = tline
     initializeLine l@(LeafLine i cls) ((Token ttype v):tokens) = case ttype of
@@ -156,6 +151,25 @@ toTreeLine tokens = initializeLine (getLineInit tokens) tokens where
         Index -> initializeLine (NodeLine i (toInt v) t) tokens
         Threshold -> initializeLine (NodeLine i idx (toFloat v)) tokens
         _ -> initializeLine l tokens
+
+
+validateLineRec :: Int -> Int -> [DecisionTreeLine] -> [DecisionTreeLine]
+validateLineRec _ 0 [] = []
+validateLineRec _ _ [] = error "Missing child!"
+validateLineRec lvl childn ((LeafLine i _):tlines)
+    | lvl /= i = error $ "Indentation! Exp.: " ++ show lvl ++ " Got: " ++ show i
+    | otherwise = tlines
+validateLineRec lvl childn ((NodeLine i idx threshold):tlines)
+    | lvl /= i = error $ "Indentation! Exp.: " ++ show lvl ++ " Got:" ++ show i
+    | idx < 0 = error "Negative index!"
+    | otherwise = snd $ until (\(x, y) -> x == 0) validateChild (childn, tlines) where
+        validateChild (remChildn, tlines) = (remChildn - 1, validateLineRec (lvl + 1) childn tlines)
+
+
+validateTree :: [DecisionTreeLine] -> [DecisionTreeLine]
+validateTree tlines = case validateLineRec 0 2 tlines of
+    [] -> tlines
+    _ -> error "There are more standalone trees in the input!"
 
 
 parse :: String -> [DecisionTreeLine]
