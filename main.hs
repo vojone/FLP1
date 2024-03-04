@@ -1,5 +1,6 @@
 import System.Environment
 import ArgumentParser
+import TreeParser
 
 main :: IO ()
 main = do

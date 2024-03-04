@@ -1,5 +1,5 @@
 BIN_NAME = flp-fun
-SOURCES = ArgumentParser.hs main.hs
+SOURCES = ArgumentParser.hs TreeParser.hs DecisionTree.hs Main.hs
 INZIP = Makefile README.md $(SOURCES)
 ZIP_NAME = xdvora3o.zip
 
@@ -13,7 +13,7 @@ FLAGS = -Wall
 	clean\
 	hi
 
-%.o: %.hs hi
+%.o: %.hs module_interfaces
 	$(COMPILER) $< -c $(FLAGS)
 
 $(BIN_NAME): $(OBJS)
@@ -28,5 +28,5 @@ zip:
 clean:
 	rm -f *.o *.hi $(BIN_NAME) $(ZIP_NAME)
 
-hi:
+module_interfaces:
 	ghc -fno-code -fwrite-interface $(SOURCES)
