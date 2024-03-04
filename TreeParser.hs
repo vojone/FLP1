@@ -173,6 +173,6 @@ validateTree tlines = case validateLineRec 0 2 tlines of
 
 
 parse :: String -> [DecisionTreeLine]
-parse str = map (parseLine) $ lines str
+parse str = validateTree . map parseLine $ lines str
 
 
