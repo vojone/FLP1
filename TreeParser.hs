@@ -8,10 +8,32 @@ import Data.List
 import Data.Maybe
 import Text.Read
 
+data BinaryTree a =
+    Empty |
+    Node a (BinaryTree a) (BinaryTree a) |
+    Leaf a
+
+instance (Show a) => Show (BinaryTree a) where
+    show tree = showRec 0 tree where
+        showRec nestLvl n = case n of
+            (Node d l r) -> nest nestLvl ++ "Node: " ++ show d ++ "\n" ++ showRec (nestLvl + 1) l ++ showRec (nestLvl + 1) r
+            (Leaf d) -> nest nestLvl ++ "Leaf: " ++ show d ++ "\n"
+        nest i = unwords $ replicate i "  "
+
+data DecisionData = 
+    Decision { index :: Int, threshold :: Float } |
+    Class { name :: String }
+
+instance Show DecisionData where
+    show decData = case decData of
+        (Decision i t) -> show i ++ ", " ++ show t
+        (Class c) -> id c
+
+type BinaryDecisionTree = BinaryTree DecisionData
 
 data DecisionTreeLine =
     None |
-    NodeLine { indent :: Int, index :: Int, threshold :: Float } |
+    NodeLine { indent :: Int, dataIndex :: Int, valThreshold :: Float } |
     LeafLine { indent :: Int, className :: String }
     deriving (Eq, Show)
 
@@ -172,7 +194,20 @@ validateTree tlines = case validateLineRec 0 2 tlines of
     _ -> error "There are more standalone trees in the input!"
 
 
-parse :: String -> [DecisionTreeLine]
-parse str = validateTree . map parseLine $ lines str
+buildTreeRec :: Int -> [DecisionTreeLine] -> ([DecisionTreeLine], BinaryDecisionTree)
+buildTreeRec _ [] = ([], Empty)
+buildTreeRec nchild (tline:tlines) = case tline of
+    (LeafLine _ className) -> (tlines, Leaf (Class className))
+    (NodeLine _ idx threshold) -> ((fst $ buildRight nchild tlines), Node (Decision idx threshold) (snd $ buildLeft nchild tlines) (snd $ buildRight nchild tlines)) where
+        buildLeft nchild tlines = buildTreeRec nchild tlines 
+        buildRight nchild tlines = buildLeft nchild $ fst $ buildLeft nchild tlines
+
+
+buildTree :: [DecisionTreeLine] -> BinaryDecisionTree
+buildTree tlines = snd $ buildTreeRec 2 tlines
+
+
+parse :: String -> BinaryDecisionTree
+parse str = buildTree . validateTree . map parseLine $ lines str
 
 
