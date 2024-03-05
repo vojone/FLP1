@@ -1,7 +1,7 @@
 module ArgumentParser
 (
-    Task,
-    Config,
+    Task(..),
+    Config(..),
     parseArgs,
 ) where
 

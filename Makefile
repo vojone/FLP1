@@ -1,5 +1,5 @@
 BIN_NAME = flp-fun
-SOURCES = ArgumentParser.hs TreeParser.hs DecisionTree.hs Main.hs
+SOURCES = ArgumentParser.hs TreeParser.hs Main.hs
 INZIP = Makefile README.md $(SOURCES)
 ZIP_NAME = xdvora3o.zip
 

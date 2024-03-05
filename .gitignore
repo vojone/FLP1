@@ -2,4 +2,5 @@ flp-fun
 *.o
 *.hi
 *.zip
-
+*.tree
+*.csv
