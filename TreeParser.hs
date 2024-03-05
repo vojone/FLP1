@@ -73,18 +73,6 @@ data ParserState =
 onStackIs :: (Eq a) => [a] -> [a] -> Bool
 onStackIs stack = (==) $ reverse stack
 
-toInt :: String -> Int
-toInt str = read str :: Int
-
-toFloat :: String -> Float
-toFloat str = read str :: Float
-
-isInt :: String -> Bool
-isInt str = isJust (readMaybe str :: Maybe Int)
-
-isFloat :: String -> Bool
-isFloat str = isJust (readMaybe str :: Maybe Float) 
-
 onStackIsInt :: String -> Bool
 onStackIsInt stack = isInt $ reverse stack
 
@@ -99,11 +87,7 @@ onStackIsNewline :: String -> Bool
 onStackIsNewline stack = onStackIs stack "\n" || onStackIs stack "\r\n"
 
 hasState :: ParserState -> [ParserState] -> Bool
-hasState state = elem state 
-
-append :: a -> [a] -> [a]
-append e [] = [e]
-append e (x:xs) = x:(append e xs)
+hasState state = elem state
 
 
 data TokenType =
@@ -198,7 +182,8 @@ buildTreeRec :: Int -> [DecisionTreeLine] -> ([DecisionTreeLine], BinaryDecision
 buildTreeRec _ [] = ([], Empty)
 buildTreeRec nchild (tline:tlines) = case tline of
     (LeafLine _ className) -> (tlines, Leaf (Class className))
-    (NodeLine _ idx threshold) -> ((fst $ buildRight nchild tlines), Node (Decision idx threshold) (snd $ buildLeft nchild tlines) (snd $ buildRight nchild tlines)) where
+    (NodeLine _ idx threshold) -> ((fst $ buildRight nchild tlines), buildNode idx threshold) where
+        buildNode idx threshold = Node (Decision idx threshold) (snd $ buildLeft nchild tlines) (snd $ buildRight nchild tlines)
         buildLeft nchild tlines = buildTreeRec nchild tlines 
         buildRight nchild tlines = buildLeft nchild $ fst $ buildLeft nchild tlines
 
