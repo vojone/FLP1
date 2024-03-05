@@ -1,12 +1,15 @@
 module TreeParser
 (
-    parse
+    parse,
+    BinaryDecisionTree,
+    BinaryTree(..),
+    DecisionData(..)
 ) where
 
 import Data.Char
 import Data.List
-import Data.Maybe
-import Text.Read
+
+import Utils
 
 data BinaryTree a =
     Empty |
@@ -121,7 +124,7 @@ parseLineRec (tokens, (stack, c:str, state))
     | state == NodeThresholdIntPart && (isDigit c) = parseLineRec (tokens, (c:stack, str, NodeThresholdIntPart))
     | state == NodeThresholdIntPart && (c == '.') = parseLineRec (tokens, (c:stack, str, NodeThresholdDecPart))
     | state == NodeThresholdDecPart && (isDigit c) = parseLineRec (tokens, (c:stack, str, NodeThresholdDecPart))
-    | state == NodeThresholdDecPart && (not $ isDigit c) = parseLineRec (append (Token Threshold (reverse stack)) tokens, (c:[], str, NodeThreshold))
+    | hasState state [NodeThresholdDecPart, NodeThresholdIntPart] && (not $ isDigit c) = parseLineRec (append (Token Threshold (reverse stack)) tokens, (c:[], str, NodeThreshold))
     | onStackIs ":" stack && state == LeafKeyword = parseLineRec (tokens, (c:[], str, LeafColon))
     | state == LeafColon && (isLetter c) = parseLineRec (tokens, (c:[], str, LeafClassChar))
     | state == LeafClassChar && (isLetter c) = parseLineRec (tokens, (c:stack, str, LeafClassChar))

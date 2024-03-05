@@ -1,24 +1,48 @@
 module DataParser
 (
-    ClassData
+    MData(..),
+    DataAttributes(..),
+    parseUnclassifiedData,
+    showClassName
 ) where
 
 import Utils
 
-data ClassData a b = ClassData {
-    attributes :: [a],
-    className :: b
+data DataAttributes a = DataAttributes {
+    values :: [a]
+}
+
+instance (Read a) => Read (DataAttributes a) where
+    readsPrec _ str = [(DataAttributes (readValues str), "")] where
+        readValues :: (Read a) => String -> [a]
+        readValues str = map (read) $ split "," str
+
+instance (Show a) => Show (DataAttributes a) where
+    show (DataAttributes []) = ""
+    show (DataAttributes (v:[])) = show v 
+    show (DataAttributes (v:rem)) = show v ++ ", " ++ show (DataAttributes rem)
+
+
+data MData a b = MData {
+    attributes :: DataAttributes a,
+    className :: Maybe b
 } deriving Show
 
 
-splitBy :: (Eq a) => [a] -> [a] -> [[a]]
-splitBy delims str = fst $ splitByRec delims $ putToList ([], str) $ span (\x -> not $ x `elem` delims) str where
-    putToList :: ([[a]], [a]) -> ([a], [a]) -> ([[a]], [a])
-    putToList (l, _) (newstr, oldstr) = (append newstr l, oldstr)
-    splitByRec :: (Eq a) => [a] -> ([[a]], [a]) -> ([[a]], [a])
-    splitByRec delims res@(_, []) = res
-    splitByRec delims res@(l, str) = splitByRec delims $ putToList res $ span (\x -> not $ x `elem` delims) $ removeSeperator str where
-        removeSeperator [] = []
-        removeSeperator res@(c:str) = if c `elem` delims then str else res
+showClassName :: MData a String -> String
+showClassName (MData _ c) = case c of
+    Just cls -> id cls
+    _ -> ""
+
+-- showClassName :: (Show b) => MData a b -> String
+-- showClassName (MData _ c) = case c of
+--     Just cls -> show cls
+--     _ -> ""
+
+
+
+
+parseUnclassifiedData input = map toMData $ lines input where
+    toMData line = MData (read line :: DataAttributes Float) (Nothing)
 
  
