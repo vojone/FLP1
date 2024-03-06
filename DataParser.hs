@@ -1,9 +1,11 @@
 module DataParser
 (
-    MData(..),
+    Object(..),
+    Dataset(..),
     DataAttributes(..),
     parseUnclassifiedData,
-    showClassName
+    showStringClass,
+    showStringClasses
 ) where
 
 import Utils
@@ -22,27 +24,34 @@ instance (Show a) => Show (DataAttributes a) where
     show (DataAttributes (v:[])) = show v 
     show (DataAttributes (v:rem)) = show v ++ ", " ++ show (DataAttributes rem)
 
-
-data MData a b = MData {
+data Object a b = Object {
     attributes :: DataAttributes a,
-    className :: Maybe b
-} deriving Show
+    mClass :: Maybe b
+}
 
+instance (Show a, Show b) => Show (Object a b) where
+    show (Object a c) = show a ++ ", " ++ show c
 
-showClassName :: MData a String -> String
-showClassName (MData _ c) = case c of
+type Dataset a b = [Object a b]
+
+showStringClass :: Object a String -> String
+showStringClass (Object _ c) = case c of
     Just cls -> id cls
-    _ -> ""
+    Nothing -> ""
 
--- showClassName :: (Show b) => MData a b -> String
--- showClassName (MData _ c) = case c of
+showStringClasses :: Dataset a String -> String
+showStringClasses objs = unlines $ map showStringClass objs
+
+
+-- showClassName :: (Show b) => Object a b -> String
+-- showClassName (Object _ c) = case c of
 --     Just cls -> show cls
 --     _ -> ""
 
 
 
-
-parseUnclassifiedData input = map toMData $ lines input where
-    toMData line = MData (read line :: DataAttributes Float) (Nothing)
+parseUnclassifiedData :: (Read a) => String -> Dataset a b
+parseUnclassifiedData input = map toObject $ lines input where
+    toObject line = Object (read line) (Nothing)
 
  
