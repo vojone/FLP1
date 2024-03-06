@@ -29,4 +29,4 @@ clean:
 	rm -f *.o *.hi $(BIN_NAME) $(ZIP_NAME)
 
 module_interfaces:
-	ghc -fno-code -fwrite-interface $(SOURCES)
+	ghc -fno-code -fwrite-interface $(FLAGS) $(SOURCES)
