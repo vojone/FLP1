@@ -4,6 +4,7 @@ module DataParser
     Dataset(..),
     DataAttributes(..),
     parseUnclassifiedData,
+    parseClassifiedData,
     showStringClass,
     showStringClasses
 ) where
@@ -33,10 +34,10 @@ instance (Read a) => Read (Object a) where
     readsPrec _ str = [(readObject $ split "," str, "")] where
         readObject :: (Read a) => [String] -> (Object a)
         readObject [] = Object (DataAttributes []) Nothing
-        readObject (lastCol:[]) = (Object (DataAttributes [])) (Just lastCol)
+        readObject (lastCol:[]) = (Object (DataAttributes [])) (Just $ trim lastCol)
         readObject (col:str) = prependAttr (read col) (readObject str) where
             prependAttr :: a -> (Object a) -> (Object a)
-            prependAttr attr (Object (DataAttributes attrs) c) = Object (DataAttributes (attr:attrs)) c 
+            prependAttr attr (Object (DataAttributes attrs) c) = Object (DataAttributes (attr:attrs)) c
 
 instance (Show a) => Show (Object a) where
     show o@(Object a c) = show a ++ ", " ++ showStringClass o
@@ -61,11 +62,13 @@ showStringClasses objs = unlines $ map showStringClass objs
 
 parseUnclassifiedData :: (Read a) => String -> Dataset a
 parseUnclassifiedData input = map toObject $ lines input where
+    toObject :: (Read a) => String -> Object a
     toObject line = Object (read line) (Nothing)
 
 
 parseClassifiedData :: (Read a) => String -> Dataset a
 parseClassifiedData input = map toObject $ lines input where
-    toObject line = Object (read line) (Nothing)
+    toObject :: (Read a) => String -> Object a
+    toObject = read 
 
  

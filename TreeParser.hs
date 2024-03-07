@@ -158,7 +158,7 @@ toTreeLine tokens = initializeLine (getLineInit tokens) tokens where
     initializeLine l@(NodeLine i idx t) ((Token ttype v):tokens) = case ttype of
         Indent -> initializeLine (NodeLine (i + 1) idx t) tokens
         Index -> initializeLine (NodeLine i (toInt v) t) tokens
-        Threshold -> initializeLine (NodeLine i idx (toFloat v)) tokens
+        Threshold -> initializeLine (NodeLine i idx (read v :: Float)) tokens
         _ -> initializeLine l tokens
 
 
