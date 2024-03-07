@@ -5,6 +5,8 @@ module DataParser
     DataAttributes(..),
     parseUnclassifiedData,
     parseClassifiedData,
+    getFeature,
+    getFeatures,
     showStringClass,
     showStringClasses
 ) where
@@ -43,6 +45,12 @@ instance (Show a) => Show (Object a) where
     show o@(Object a c) = show a ++ ", " ++ showStringClass o
 
 type Dataset a = [Object a]
+
+getFeature :: Int -> Object a -> a
+getFeature index (Object (DataAttributes a) _) = (!!) a index
+
+getFeatures :: Int -> Dataset a -> [a]
+getFeatures index objs = map (getFeature index) objs 
 
 showStringClass :: Object a -> String
 showStringClass (Object _ c) = case c of

@@ -15,6 +15,7 @@ import Data.Maybe
 import Data.Char
 import qualified Data.Set as Set
 import Text.Read
+import Data.List
 
 trim :: String -> String
 trim = trimRev . trimRev where

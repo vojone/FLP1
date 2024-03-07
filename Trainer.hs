@@ -3,6 +3,7 @@ module Trainer (
 ) where
 
 import Data.Maybe
+import Data.List
 
 import TreeParser
 import DataParser
@@ -41,9 +42,21 @@ splitDataset objs i thr = fst $ splitDatasetRec (([], []), objs) i thr where
     splitDatasetRec ((l, r), o:objs) i thr = case o of
         Object (DataAttributes a) _ | (a !! i) < thr -> splitDatasetRec ((o:l, r), objs) i thr
         Object (DataAttributes a) _ | (a !! i) >= thr -> splitDatasetRec ((l, o:r), objs) i thr
-    
 
--- iniIndex :: Float
+getGiniOfSplit :: DatasetSplit a -> Float
+getGiniOfSplit s@(d1, d2) = ( (toFloat $ length d1) / (toFloat $ totalCnt s))*getGini d1 + 
+    ((toFloat $ length d2) /(toFloat $ totalCnt s))*getGini d2 where
+    totalCnt :: DatasetSplit a -> Int
+    totalCnt (d1, d2) = length d1 + length d2
 
--- train :: Dataset Float String -> BinaryDecisionTree
--- train :: 
+
+findThreshold :: (Fractional a, Ord a) => Dataset a -> Int -> a
+findThreshold objs i = fst $ foldr (\(t, g) (at, ag) -> if g < ag then (t, g) else (at, ag)) (fst ((computeGinis objs i) !! 0), 1.0) $ computeGinis objs i where
+    computeGinis objs i = map (\(t, s) -> (t, getGiniOfSplit s)) $ createSplits objs i
+    createSplits objs i = map (\t -> (t, splitDataset objs i t)) $ snd findPotentialThresholds 
+    findPotentialThresholds = foldr (\x (it, l) -> if it > 0 then (it - 1, (avg x $ ln it):l) else (0, l)) (length vals - 1, []) vals
+    avg :: (Fractional a, Ord a) => a -> a -> a
+    avg x y = (x + y) / 2 
+    vals = getFeatures i objs
+    ln it = vals !! (it - 1)
+
