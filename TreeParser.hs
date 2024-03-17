@@ -21,6 +21,7 @@ instance (Show a) => Show (BinaryTree a) where
         showRec nestLvl n = case n of
             (Node d l r) -> nest nestLvl ++ "Node: " ++ show d ++ "\n" ++ showRec (nestLvl + 1) l ++ showRec (nestLvl + 1) r
             (Leaf d) -> nest nestLvl ++ "Leaf: " ++ show d ++ "\n"
+            (Empty) -> nest nestLvl ++ "Empty" ++ "\n"
         nest i = unwords $ replicate i "  "
 
 data DecisionData = 

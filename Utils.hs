@@ -1,5 +1,8 @@
 module Utils
 (
+    select1,
+    select2,
+    select3,
     trim,
     nd,
     append,
@@ -13,17 +16,27 @@ module Utils
 
 import Data.Maybe
 import Data.Char
-import qualified Data.Set as Set
 import Text.Read
 import Data.List
+
+select1 :: (a, b, c) -> a
+select1 (x, _, _) = x
+
+select2 :: (a, b, c) -> b
+select2 (_, x, _) = x
+
+select3 :: (a, b, c) -> c
+select3 (_, _, x) = x
 
 trim :: String -> String
 trim = trimRev . trimRev where
     trimRev :: String -> String
     trimRev = reverse . snd . span isSpace
 
-nd :: (Ord a) => [a] -> [a] 
-nd = Set.toList . Set.fromList
+nd :: (Eq a) => [a] -> [a] 
+nd [] = []
+nd [x] = [x]
+nd (x:remainder) = if elem x remainder then (nd remainder) else x:(nd remainder)
 
 append :: a -> [a] -> [a]
 append e [] = [e]

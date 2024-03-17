@@ -1,4 +1,5 @@
 module Trainer (
+    trainTree,
     getClasses
 ) where
 
@@ -23,6 +24,9 @@ cntClassMembers clsName = foldr (incCnter clsName) 0 where
     incCnter clsName  (Object _ cls) acc = case cls of
         Just c | c == clsName -> acc + 1
         _ -> acc
+
+getMostProbableClass :: Dataset a -> String
+getMostProbableClass objs = fst $ foldr (\c acc -> if fst acc == "" || snd acc < snd c then c else acc) ("", 0) $ map (\c -> (c, cntClassMembers c objs)) $ getUniqueClasses objs
 
 getGini :: Dataset a -> Float
 getGini objs = 1 - (sum $ sqProbs (memberCnts objs) (totalCnt objs)) where
@@ -50,9 +54,9 @@ getGiniOfSplit s@(d1, d2) = ( (toFloat $ length d1) / (toFloat $ totalCnt s))*ge
     totalCnt (d1, d2) = length d1 + length d2
 
 
-findThreshold :: (Fractional a, Ord a) => Dataset a -> Int -> a
-findThreshold objs i = fst $ foldr (\(t, g) (at, ag) -> if g < ag then (t, g) else (at, ag)) (fst ((computeGinis objs i) !! 0), 1.0) $ computeGinis objs i where
-    computeGinis objs i = map (\(t, s) -> (t, getGiniOfSplit s)) $ createSplits objs i
+findThreshold :: (Fractional a, Ord a) => Dataset a -> Int -> (a, DatasetSplit a, Float)
+findThreshold objs i = foldr (\(t, s, g) (at, as, ag) -> if g < ag then (t, s, g) else (at, as, ag)) (select1 $ ((computeGinis objs i) !! 0), ([], []), 1.0) $ computeGinis objs i where
+    computeGinis objs i = map (\(t, s) -> (t, s, getGiniOfSplit s)) $ createSplits objs i
     createSplits objs i = map (\t -> (t, splitDataset objs i t)) $ snd findPotentialThresholds 
     findPotentialThresholds = foldr (\x (it, l) -> if it > 0 then (it - 1, (avg x $ ln it):l) else (0, l)) (length vals - 1, []) vals
     avg :: (Fractional a, Ord a) => a -> a -> a
@@ -60,3 +64,18 @@ findThreshold objs i = fst $ foldr (\(t, g) (at, ag) -> if g < ag then (t, g) el
     vals = getFeatures i objs
     ln it = vals !! (it - 1)
 
+getBestSplit :: (Fractional a, Ord a) => Dataset a -> (Int, a, DatasetSplit a)
+getBestSplit objs = separateIndexThreshold $ getBestSplit' objs where
+    separateIndexThreshold (i, (t, s, _)) = (i, t, s)
+    getBestSplit' objs@((Object (DataAttributes a) _):_) = foldr (\(i, (t, s, g)) (ai, (at, as, ag)) -> if g < ag then (i, (t, s, g)) else (ai, (at, as, ag))) (0, (0.0, ([], []), 1.0)) $ computeGinis objs
+    computeGinis objs@((Object (DataAttributes a) _):_) = map (\i -> (i, findThreshold objs i)) [0..length a - 1]
+
+
+trainTree :: Dataset Float -> BinaryDecisionTree -> BinaryDecisionTree
+trainTree [] _ = Empty
+trainTree objs Empty = buildSubtree objs (getBestSplit objs) where
+    buildSubtree :: Dataset Float -> (Int, Float, DatasetSplit Float) -> BinaryDecisionTree
+    buildSubtree objs@(o:_) (_, _, ([], _)) = Leaf (Class $ getMostProbableClass objs)
+    buildSubtree objs@(o:_) (_, _, (_, [])) = Leaf (Class $ getMostProbableClass objs)
+    buildSubtree objs@(o:_) (index, threshold, (l, r)) = Node (Decision index threshold) (trainTree l Empty) (trainTree r Empty)
+trainTree _ _ = Empty
