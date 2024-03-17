@@ -35,7 +35,7 @@ train dataFilePath = do
 
     let tree = trainTree trainData Empty
 
-    putStrLn $ show tree
+    putStr $ show tree
 
     hClose dataFileHandle
 

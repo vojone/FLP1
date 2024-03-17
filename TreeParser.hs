@@ -22,7 +22,7 @@ instance (Show a) => Show (BinaryTree a) where
             (Node d l r) -> nest nestLvl ++ "Node: " ++ show d ++ "\n" ++ showRec (nestLvl + 1) l ++ showRec (nestLvl + 1) r
             (Leaf d) -> nest nestLvl ++ "Leaf: " ++ show d ++ "\n"
             (Empty) -> nest nestLvl ++ "Empty" ++ "\n"
-        nest i = unwords $ replicate i "  "
+        nest i = concat $ replicate i "  "
 
 data DecisionData = 
     Decision { index :: Int, threshold :: Float } |
