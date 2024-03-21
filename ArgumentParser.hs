@@ -5,43 +5,73 @@ module ArgumentParser
     parseArgs,
 ) where
 
+
+type ArgErr = String
+
+
+type Option a = Maybe a
+
+
 data Task =
     Help |
-    Classification String String |
-    Training String
+    Classification (Option String) (Option String) |
+    Training (Option String)
     deriving (Show, Eq)
+
 
 data Config = Config {
     task :: Task
-} deriving (Show)
-
-configDefault :: Config
-configDefault = Config Help
-
-getFilePath :: [String] -> Int -> String
-getFilePath list index = if index >= length list 
-    then error "Missing filepath!"
-    else list !! index 
-
-shiftArgs :: [String] -> Int -> [String]
-shiftArgs args 0 = args
-shiftArgs [] _ = []
-shiftArgs (_:args) i = shiftArgs args $ i - 1
-
-parseArg :: Config -> String -> [String] -> (Config, [String])
-parseArg (Config t) arg args
-    | t /= Help = error "Usage error!"
-    | arg == "-1" = (Config (Classification (getFilePath args 0) (getFilePath args 1)), shiftArgs args 2)
-    | arg == "-2" = (Config (Training (getFilePath args 0)), shiftArgs args 1)
-    | otherwise = error ("Unknown argument " ++ arg ++ "!")
+} deriving (Show, Eq)
 
 
-parseArgs :: [String] -> Config
+configDefault :: Either ArgErr Config
+configDefault = Right $ Config Help
+
+
+check :: Task -> Either ArgErr Task
+check (Classification Nothing Nothing) = Left "-1 requires two arguments (see `--help` for usage)"
+check (Classification _ Nothing) = Left "-1 requires two arguments (see `--help` for usage)"
+check (Training Nothing) = Left "-2 requires two arguments (see `--help` for usage)"
+check t = Right t
+
+
+addParam :: Task -> String -> Task
+addParam (Classification Nothing Nothing) p = Classification (Just p) Nothing
+addParam (Classification p1 Nothing) p = Classification p1 (Just p)
+addParam (Training Nothing) p = Training (Just p)
+addParam task _ = task
+
+
+parseParams :: (Task, [String]) -> (Either ArgErr Task, [String])
+parseParams (task, []) = (check task, [])
+parseParams (task, orig@(a:args)) =
+    let updatedTask = addParam task a
+    in if updatedTask == task
+        then (Right task, orig)
+        else parseParams (updatedTask, args)
+
+
+parseArg :: (Either ArgErr Config, [String]) -> (Either ArgErr Config, [String])
+parseArg ((Right c@(Config t)), (arg:args))
+    | t /= Help = (Left $ "Only one option -1 or -2 can be specified!", [])
+    | arg == "-1" = createConfig (Classification Nothing Nothing) args
+    | arg == "-2" = createConfig (Training Nothing) args
+    | otherwise = (Left $ "Unexpected argument " ++ arg ++ "!", [])
+    where
+        createConfig :: Task -> [String] -> (Either ArgErr Config, [String])
+        createConfig task args = case parseParams (task, args) of
+            (Right t, rest) -> (Right $ Config t, rest)
+            (Left err, rest) -> (Left err, [])
+parseArg x@((Left _), args) = x
+
+
+parseArgs :: [String] -> Either ArgErr Config
 parseArgs [] = configDefault
 parseArgs args =
-    let parseRemainingArgs :: Config -> [String] -> Config
-        parseRemainingArgs config [] = config
-        parseRemainingArgs config (arg:argstail) = uncurry parseRemainingArgs $ parseArg config arg argstail
+    let parseArgs' :: (Either ArgErr Config, [String]) -> (Either ArgErr Config, [String])
+        parseArgs' (config, []) = (config, [])
+        parseArgs' x = parseArgs' $ parseArg x
     in if (elem "-h" args) || (elem "--help" args)
-        then Config Help
-        else parseRemainingArgs configDefault args
+        then Right $ Config Help
+        else fst $ parseArgs' (configDefault, args)
+
