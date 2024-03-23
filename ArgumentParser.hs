@@ -11,42 +11,25 @@ module ArgumentParser
     parseArgs,
 ) where
 
-import Data.List
-
 -- | Type for errors that occur during the parsing of arguments
 type ArgErr = String
-
--- | Type for optional parameters of program or another argument
-type Option a = Maybe a
 
 
 -- | Structure storing task and its variables, that can be configured by the user through
 -- commandline arguments
 data Task =
     Help | -- Defaul task (see configDefault)
-    Classification (Option String) (Option String) |
-    Training (Option String)
+    Classification String String |
+    Training String
     deriving (Show, Eq)
 
 
 -- | Structure for storing the result of the parsing, contains values for configurable variables
 -- of the program
 data Config = Config {
-    task :: Task
+    programTask :: Task
 } deriving (Show, Eq)
 
-
--- | List of key-values pairs that contains all possible exclusive args (only one of them can be
--- passed to the commandline at the same time) 
-exArgs :: [(String, Task)]
-exArgs = [
-        ("-1", Classification Nothing Nothing),
-        ("-2", Training Nothing)
-    ]
-
--- | List of key-values pairs with nonexclusive arguments of the program
-nonexlusiveArgs :: [(String, a)]
-nonexlusiveArgs = []
 
 
 -- | Default configuration structure of program
@@ -54,64 +37,79 @@ configDefault :: Either ArgErr Config
 configDefault = Right $ Config Help
 
 
--- | Provides check the task structure, if all mandatory parameters are spcified 
-check :: Task -> Either ArgErr Task
-check (Classification Nothing Nothing) = Left "-1 requires two arguments (see `--help` for usage)"
-check (Classification _ Nothing) = Left "-1 requires two arguments (see `--help` for usage)"
-check (Training Nothing) = Left "-2 requires one argument (see `--help` for usage)"
-check t = Right t
+-- | Argument parser return type, parsing can end with correct Config or with ArgErr
+type ParserResult = Either ArgErr Config
 
 
--- | Adds paremeter to the given task
-addParam :: Task -> String -> Either ArgErr Task
-addParam (Classification Nothing Nothing) p = Right $ Classification (Just p) Nothing
-addParam (Classification p1 Nothing) p = Right $ Classification p1 (Just p)
-addParam (Training Nothing) p = Right $ Training (Just p)
-addParam task _ = Right task
+-- | Type for argument hadnling function
+-- Function takes existing config, list with the rest of arguments and returns
+-- ParserResult (updated config or error) with thre rest of arguments in a tuple
+type ArgumentParserF = Config -> [String] -> (ParserResult, [String])
 
 
--- | Constructs readable string with all keys in the list with arguments 
+-- | List of key-value pairs for each exclusive argument of program (only one
+-- argument from this list can be passed)
+exArgs :: [(String, ArgumentParserF)]
+exArgs = [
+--       arg    handler
+        ("-1", parseClassificationArgs),
+        ("-2", parseTrainingArgs)
+    ]
+
+
+-- | List of key-value pairs with nonexclusive arguments of the program
+-- NOTE: Currently this list is unused, but it is integrated for better 
+-- extensibility
+nonexArgs :: [(String, a)]
+nonexArgs = []
+
+
+-- ------ Argument handlers -------
+
+-- | Handling function for -1 (classification task)
+-- -1 expects another two arguments - path to file with tree and path the file with data 
+parseClassificationArgs :: ArgumentParserF
+parseClassificationArgs _ [] = (Left "-1: missing paths to tree and data files! (see --help)", [])
+parseClassificationArgs _ (_:[]) = (Left "-1: missing path to file with data! (see --help)", [])
+parseClassificationArgs c (f1:f2:r) = (Right $ c {programTask=(Classification f1 f2)}, r)
+
+
+-- | Handling function for -2 (training task)
+-- -2 expects another one argument - path to the file with annotated data 
+parseTrainingArgs :: ArgumentParserF
+parseTrainingArgs _ [] = (Left "-2: missing path to the file with annot. data! (see --help)", [])
+parseTrainingArgs c (f:r) = (Right $ c {programTask=(Training f)}, r)
+
+-- --------------------------------
+
+
+
+-- | Constructs readable string with all keys in the list with arguments, just for more readable
+-- error messages
 showKeys :: [(String, a)] -> String
 showKeys argList = foldr catArgKeys "" $ map fst argList where
     catArgKeys :: String -> String -> String
     catArgKeys = \x acc -> if acc /= "" then "'" ++ x ++ "', " ++ acc else "'" ++ x ++ "'"
 
 
--- | Parses options of commandline argument (repesented by task in this case)
-parseParams :: (Either ArgErr Task, [String]) -> (Either ArgErr Task, [String])
-parseParams ((Right task), []) = (check task, [])
-parseParams (t@(Right task), orig@(a:args)) =
-    let updatedTask = addParam task a :: Either ArgErr Task
-    in if updatedTask == t
-        then (Right task, orig)
-        else parseParams (updatedTask, args)
-parseParams x@(Left task, _) = x
-
-
 -- | Parses commandline arguments and its options, if argument has any
-parseArg :: (Either ArgErr Config, [String]) -> (Either ArgErr Config, [String])
-parseArg (c@(Right _), (arg:args)) = case (lookup arg exArgs, lookup arg nonexlusiveArgs) of
-    (Just task, _) -> if c /= configDefault -- Argument is exclusive
+parseArg :: (ParserResult, [String]) -> (ParserResult, [String])
+parseArg (res@(Right config), (arg:args)) = case (lookup arg exArgs, lookup arg nonexArgs) of
+    (Just f, _) -> if res /= configDefault -- Argument is exclusive
         then (Left $ "Only one argument (one of " ++ (showKeys exArgs) ++ ") can be used!", [])
-        else createConfig task args
-    (_, Just task) -> createConfig task args -- Current argument is non-exclusive one
-    (Nothing, Nothing) -> (Left $ "An unexpected argument '" ++ arg ++ "'!", [])
-    where
-        -- | Creates config based on the Task structure (that represents an argument)
-        createConfig :: Task -> [String] -> (Either ArgErr Config, [String])
-        createConfig task args = case parseParams (Right task, args) of
-            (Right t, rest) -> (Right $ Config t, rest)
-            (Left err, rest) -> (Left err, [])
-parseArg x@((Left _), args) = x
+        else f config args
+    (_, Just f) -> f config args -- Current argument is non-exclusive one
+    (Nothing, Nothing) -> (Left $ "An unknown argument '" ++ arg ++ "'!", [])
+parseArg x@((Right _), []) = x
+parseArg x@((Left _), _) = x
 
 
--- | Parses and array with commandline arguments and creates Config structure base on this
+-- | Parses a list with commandline arguments and creates Config structure base on this
 -- array, if some error occurs during the argument parsing, ArgErr is returned instead of Config
-parseArgs :: [String] -> Either ArgErr Config
+parseArgs :: [String] -> ParserResult
 parseArgs [] = configDefault
 parseArgs args =
-    let parseArgs' :: (Either ArgErr Config, [String]) -> (Either ArgErr Config, [String])
-        parseArgs' (config, []) = (config, [])
+    let parseArgs' :: (ParserResult, [String]) -> (ParserResult, [String])
         parseArgs' x = parseArgs' $ parseArg x
     in if (elem "-h" args) || (elem "--help" args)
         then Right $ Config Help
