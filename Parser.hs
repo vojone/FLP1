@@ -12,6 +12,10 @@ module Parser
     Default(..),
     ParserCtx(..),
     initParserCtx,
+    clearb,
+    convert,
+    convertold,
+    compose,
     (+++),
     (<|>),
     (<*.),
@@ -111,8 +115,33 @@ updatePos p readStr = foldr (\x (r, c) -> if x == '\n' then (r + 1, 0) else (r, 
 
 
 -- | Clears auxiliary buffer in the parsing context
-clearBuf :: ParserCtx a -> ParserCtx a
-clearBuf ctx = ctx {buf=""}
+clearb :: ParserCtx a -> ParserCtx a
+clearb ctx = ctx {buf=""}
+
+
+-- | Performs conversion of string in buffer to value in parser result, if there is Left value
+-- context is not changed
+-- IMPORTANT: Deletes the old result
+convert :: (String -> a) -> ParserCtx a -> ParserCtx a
+convert convf ctx = case ctx of
+    ParserCtx{res=(Left _)} -> ctx
+    ParserCtx{res=(Right _), buf=s} -> ctx{res=(Right $ convf s)}
+
+
+-- | Performs conversion of string in buffer to value in parser result taking into account the 
+-- previous value
+convertold :: (String -> a -> a) -> ParserCtx a -> ParserCtx a
+convertold convf ctx = case ctx of
+    ParserCtx{res=(Left _)} -> ctx
+    ParserCtx{res=(Right old), buf=s} -> ctx{res=(Right $ convf s old)}
+
+
+-- | Converts the result value of the parser to the value of different type, if there is an error
+-- in the context the same context is returned
+compose :: (a -> b) -> ParserCtx a -> ParserCtx b
+compose convf ctx = case ctx of
+    ParserCtx{res=(Left old)} -> ctx{res=(Left old :: ParserResult b)}
+    ParserCtx{res=(Right old), buf=s} -> ctx{res=(Right $ convf old)}
 
 
 -- | Adds expected token to the error structure
