@@ -7,18 +7,22 @@ Author: Vojtěch Dvořák (xdvora3o)
 
 module Parser
 (
-    -- parse,
+    ParserErr,
+    ParserResult,
+    Default(..),
     ParserCtx(..),
     initParserCtx,
     (<->>),
     (<|>),
     (<*.>),
     (<+.>),
+    (<?.>),
     (<-*>),
+    Token(..),
+    TokenF(..),
     tok,
     tokf,
     tokf1
-    --tokf1
 ) where
 
 import Data.Char
@@ -83,6 +87,10 @@ data ParserCtx a = ParserCtx {
 } deriving (Show)
 
 
+-- | Type for concrete functions that perform the parsing
+type ParseFunc a = ParserCtx a -> ParserCtx a
+
+
 -- | Initial parserCtx structure
 initParserCtx :: (Default a) => String -> ParserCtx a
 initParserCtx inputStr = ParserCtx (0,0) inputStr "" (Right $ defv)
@@ -129,7 +137,7 @@ skipSpaces = snd . span (\c -> isSpace c && (not $ c `elem` "\r\n"))
 infixl 3 <->>
 
 -- | Sequence - Example: `parseA <->> parseB` will accept "AB"
-(<->>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<->>) :: ParseFunc a -> ParseFunc a -> ParseFunc a
 fl <->> fr = \ctx -> case fl ctx of
     rctx@ParserCtx{res=(Right _)} -> fr rctx
     ParserCtx{res=(Left _)} -> fl ctx -- If there is an error skip the second parsing function
@@ -138,16 +146,16 @@ fl <->> fr = \ctx -> case fl ctx of
 infixl 1 <|>
 
 -- | Alternatives - Example: `parseA <|> parseB` will accept "A" as well as "B"
-(<|>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<|>) :: ParseFunc a -> ParseFunc a -> ParseFunc a
 fl <|> fr = \ctx -> case fl ctx of
     ParserCtx{res=(Right _)} -> fl ctx
     lctx@ParserCtx{res=(Left _)} -> fr lctx -- If there is and error try the second alternative
 
 
-infixr 5 <*.>
+infixr 6 <*.>
 
 -- | Iteration -- Example: `<*.> parseA` will accept "", "A", "AA"...
-(<*.>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<*.>) :: ParseFunc a -> ParseFunc a
 (<*.>) f = \ctx -> case f ctx of
     rctx@ParserCtx{res=(Right _)} -> ((<*.>) f) rctx
     ParserCtx{res=(Left _)} -> ctx -- If there is an error terminate iteration
@@ -156,14 +164,23 @@ infixr 5 <*.>
 infixr 6 <+.>
 
 -- | Positive iteration -- Example: `<*.> parseA` will accept "A", "AA", "AAA"...
-(<+.>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<+.>) :: ParseFunc a -> ParseFunc a
 (<+.>) f = ((<*.>) f) . f
 
 
-infixr 6 <-*>
+infixr 6 <?.>
+
+-- | Optional -- Example: `<?.> parseA <->> parseB` will accept "B", "AB"
+(<?.>) :: ParseFunc a -> ParseFunc a
+(<?.>) f = \ctx -> case f ctx of
+    rctx@ParserCtx{res=(Right _)} -> rctx
+    ParserCtx{res=(Left _)} -> ctx -- If there is an error return the original ctx
+
+
+infixr 5 <-*>
 
 -- | Whitespace skip -- Example: `<-*> parseA` will accept "A", " A", "  A", "\tA"...
-(<-*>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<-*>) :: ParseFunc a -> ParseFunc a
 (<-*>) f = \ctx@ParserCtx {str=s} -> f $ ctx {str=(skipSpaces s)}
 
 
@@ -190,11 +207,11 @@ infix 0 >?:
 -- | Data type for token (for more readable definition of grammar rules), the first string
 -- is string than is expected in input, the second string is short textual description of expected
 -- string for more readable error messages
-infixl 9 :!
+infixr 9 :!
 data Token = String :! String
 
 
-infixl 9 :?!
+infixr 9 :?!
 data TokenF = (Char -> Bool) :?! String
 
 -- | Function that check if the prefix of the input contains specific token
