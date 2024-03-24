@@ -1,5 +1,7 @@
 module Utils
 (
+    isNewline,
+    --
     select1,
     select2,
     select3,
@@ -14,10 +16,15 @@ module Utils
     isFloat
 ) where
 
+
 import Data.Maybe
 import Data.Char
 import Text.Read
 import Data.List
+
+isNewline :: Char -> Bool
+isNewline = flip elem ['\n', '\r'] 
+
 
 select1 :: (a, b, c) -> a
 select1 (x, _, _) = x

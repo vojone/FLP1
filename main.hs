@@ -20,7 +20,7 @@ classifyData treeFilePath dataFilePath = do
     dataFileContents <- hGetContents dataFileHandle
     let tree = parse treeFileContents
     let newData = parseUnclassifiedData dataFileContents
-    
+
     putStrLn $ showStringClasses $ classify tree newData
 
     hClose treeFileHandle
@@ -40,12 +40,14 @@ train dataFilePath = do
     hClose dataFileHandle
 
 
+-- | Main body of flp-fun program
 main :: IO ()
 main = do
     args <- getArgs
     let config = parseArgs args
     case config of
-        Config (Classification f1 f2) -> classifyData f1 f2
-        Config (Training f) -> train f
+        Left err -> putStrLn $ "Usage error: " ++ err
+        Right (Config (Classification treeFile dataFile)) -> classifyData treeFile dataFile
+        Right (Config (Training dataFile)) -> train dataFile
         _ -> printHelp
     

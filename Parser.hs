@@ -15,7 +15,7 @@ module Parser
     clearb,
     convert,
     convertold,
-    compose,
+    (<=>),
     (+++),
     (<|>),
     (<*.),
@@ -136,12 +136,17 @@ convertold convf ctx = case ctx of
     ParserCtx{res=(Right old), buf=s} -> ctx{res=(Right $ convf s old)}
 
 
+infixl 3 <=>
+
 -- | Converts the result value of the parser to the value of different type, if there is an error
 -- in the context the same context is returned
-compose :: (a -> b) -> ParserCtx a -> ParserCtx b
-compose convf ctx = case ctx of
-    ParserCtx{res=(Left old)} -> ctx{res=(Left old :: ParserResult b)}
-    ParserCtx{res=(Right old), buf=s} -> ctx{res=(Right $ convf old)}
+(<=>) :: (Default a) => ParseFunc a -> (a -> b -> b) -> ParseFunc b
+fl <=> convf = \ctx -> case ctx of
+    lctx@ParserCtx{res=(Left old)} -> lctx{res=(Left old)}
+    ParserCtx{pos=p,buf=b,str=s,res=(Right new)} -> case fl $ ParserCtx {pos=p,buf=b,str=s,res=(Right $ defv)} of
+        llctx@ParserCtx{res=(Left old)} -> llctx{res=(Left old)}
+        rctx@ParserCtx{res=(Right old)} -> rctx{res=(Right $ convf old new)}
+
 
 
 -- | Adds expected token to the error structure
