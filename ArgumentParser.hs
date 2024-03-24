@@ -1,6 +1,8 @@
 {- | 
 ArgumentParser module
-Module responsible for parsing of commandline arguments
+Module responsible for parsing of commandline arguments, this module is designed to be extensible
+and therefore there may be some unused features that are prepared for extensions
+
 Author: Vojtěch Dvořák (xdvora3o) 
 -}
 

@@ -16,7 +16,8 @@ module Parser
     (<+.>),
     (<-*>),
     tok,
-    tokf
+    tokf,
+    tokf1
     --tokf1
 ) where
 
@@ -214,9 +215,9 @@ tokf (strFunc :?! expStr) ctx@ParserCtx{str=s} = case strFunc >?: s of
     (pref, newStr) -> move pref newStr ctx
 
 
--- -- | Same as tokf, but only one the first from the prefix is accepted
--- tokf1 :: (Default a) => TokenF -> ParserCtx a -> ParserCtx a
--- tokf1 (_ :?! expStr) ctx@ParserCtx{str=""} = addExp expStr ctx
--- tokf1 (strFunc :?! expStr) ctx@ParserCtx{str=(prefChar:s)} = case strFunc >?: prefChar of
---     ([], _) -> addExp expStr ctx
---     (pref, _) -> move pref s ctx
+-- | Same as tokf, but only one the first from the prefix is accepted
+tokf1 :: (Default a) => TokenF -> ParserCtx a -> ParserCtx a
+tokf1 (_ :?! expStr) ctx@ParserCtx{str=""} = addExp expStr ctx
+tokf1 (strFunc :?! expStr) ctx@ParserCtx{str=(prefChar:s)} = case strFunc >?: [prefChar] of
+    ([], _) -> addExp expStr ctx
+    (pref, _) -> move pref s ctx
