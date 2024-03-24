@@ -45,6 +45,44 @@ type BinaryDecisionTree = BinaryTree DecisionData
 --     deriving (Eq, Show)
 
 
+
+-- | Following functions are framework for creating custom parsers - because there are two
+-- formats in flp-fun project (tree, csv), these functions were created to have better reusability
+-- of the parsing, better exensibility and to be reusable for other projects
+-- NOTE: this approach is probably overkill for flp-fun project, but it was fun  
+
+-- Example of usage:
+-- We want to accept strings /\(\d+\+\d+\)/ (for example: "(1+2)" ), so we can define regular
+-- grammar:
+-- ```
+-- number = tokf ( isDigit :?! "number")
+-- 
+-- op = tok ( "+" :! "+")
+-- 
+-- parse = tok ( "(" :! "(") <->> number <->> op <->> number <->> tok ( ")" :! ")")
+-- ```
+--
+-- Then we can parse string "(123+245)":
+-- ```
+-- ctx = initParserCtx "(123+456)" :: ParserCtx (BinaryTree Int) -- BinaryTree is just example
+-- parse ctx
+-- ```
+-- Result:
+-- ```
+-- ParserCtx {pos = (0,9), str = "", buf = "(123+456)", res = Right EmptyTree}
+-- ```
+--
+-- But if we try "(123+a456)":
+-- ```
+-- errCtx = initParserCtx "(123+a456)" :: ParserCtx (BinaryTree Int) -- BinaryTree is just example
+-- parse errCtx
+-- ```
+--- Result:
+-- ```
+-- ParserCtx {pos = (0,5), str = "a456", buf = "(123+", res = Left ("",["number"])}
+-- ```
+
+
 -- | Data type for storing parsing errors, first member of tuple can be used for custom message
 -- in the second member can be stored expected tokens
 type ParserErr = (String, [String])
@@ -69,12 +107,12 @@ data ParserCtx a = ParserCtx {
 
 -- | Initial parserCtx structure
 initParserCtx :: (Default a) => String -> ParserCtx a
-initParserCtx str = ParserCtx (0,0) str "" (Right $ defv)
+initParserCtx inputStr = ParserCtx (0,0) inputStr "" (Right $ defv)
 
 
 -- | Updates position of the reading head due to the string that has been read
 updatePos :: (Int, Int) -> String -> (Int, Int)
-updatePos p str = foldr (\x (r, c) -> if x == '\n' then (r + 1, 0) else (r, c + 1)) p str
+updatePos p readStr = foldr (\x (r, c) -> if x == '\n' then (r + 1, 0) else (r, c + 1)) p readStr
 
 
 -- | Clears auxiliary buffer in the parsing context
@@ -90,13 +128,13 @@ addExp expStr ctx@ParserCtx{res=(Left (msg, exps))} = ctx {res=(Left (msg, expSt
 
 -- | Updates ParserCtx structure when the correct token is found
 move :: (Default a) => String -> String -> ParserCtx a -> ParserCtx a
-move readStr newStr ctx@ParserCtx{pos=p, buf=b, str=s, res=(Left _)} = ctx {
+move readStr newStr ctx@ParserCtx{pos=p, buf=b, res=(Left _)} = ctx {
         pos=(updatePos p readStr),
         buf=(b ++ readStr),
         str=newStr,
         res=(Right $ defv)
     }
-move readStr newStr ctx@ParserCtx{pos=p, buf=b, str=s} = ctx {
+move readStr newStr ctx@ParserCtx{pos=p, buf=b} = ctx {
         pos=(updatePos p readStr),
         buf=(b ++ readStr),
         str=newStr
@@ -110,25 +148,25 @@ skipSpaces = snd . span (\c -> isSpace c && (not $ c `elem` "\r\n"))
 
 
 -- ------ Functions for creating grammar rules --------
-infixl 6 <->>
+infixl 3 <->>
 
 -- | Sequence - Example: `parseA <->> parseB` will accept "AB"
 (<->>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
-(<->>) fl fr = \ctx -> case fl ctx of
+fl <->> fr = \ctx -> case fl ctx of
     rctx@ParserCtx{res=(Right _)} -> fr rctx
     ParserCtx{res=(Left _)} -> fl ctx -- If there is an error skip the second parsing function
 
 
-infixl 3 <|>
+infixl 1 <|>
 
 -- | Alternatives - Example: `parseA <|> parseB` will accept "A" as well as "B"
 (<|>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
-(<|>) fl fr = \ctx -> case fl ctx of
+fl <|> fr = \ctx -> case fl ctx of
     ParserCtx{res=(Right _)} -> fl ctx
     lctx@ParserCtx{res=(Left _)} -> fr lctx -- If there is and error try the second alternative
 
 
-infixr 8 <*.>
+infixr 5 <*.>
 
 -- | Iteration -- Example: `<*.> parseA` will accept "", "A", "AA"...
 (<*.>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
@@ -137,14 +175,14 @@ infixr 8 <*.>
     ParserCtx{res=(Left _)} -> ctx -- If there is an error terminate iteration
 
 
-infixr 8 <+.>
+infixr 6 <+.>
 
 -- | Positive iteration -- Example: `<*.> parseA` will accept "A", "AA", "AAA"...
 (<+.>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
 (<+.>) f = ((<*.>) f) . f
 
 
-infixr 9 <-*>
+infixr 6 <-*>
 
 -- | Whitespace skip -- Example: `<-*> parseA` will accept "A", " A", "  A", "\tA"...
 (<-*>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
@@ -153,40 +191,60 @@ infixr 9 <-*>
 
 -- ---------------------------------------------------
 
-
-infixr 5 <?>
+infix 0 >:
 
 -- | Strips given prefix and returns it in tuple with the rest of that string
-(<?>) :: String -> String -> (String, String)
-(<?>) pref str = case stripPrefix pref str of
+(>:) :: String -> String -> (String, String)
+pref >: haystackStr = case stripPrefix pref haystackStr of
     Just newStr -> (pref, newStr) 
-    Nothing -> ("", str)
+    Nothing -> ("", haystackStr)
 
 
-infixr 5 <??>
+
+infix 0 >?:
 
 -- | Strips prefix defined by function and returns it in tuple with the rest of that string
 -- Same as span
-(<??>) :: (Char -> Bool) -> String -> (String, String)
-(<??>) = span
+(>?:) :: (Char -> Bool) -> String -> (String, String)
+(>?:) = span
 
 
+-- | Data type for token (for more readable definition of grammar rules), the first string
+-- is string than is expected in input, the second string is short textual description of expected
+-- string for more readable error messages
+infixl 9 :!
+data Token = String :! String
+
+
+infixl 9 :?!
+data TokenF = (Char -> Bool) :?! String
+
+-- | Function that check if the prefix of the input contains specific token
+-- Example: `tok ("  " :! "indent")` accepts "  ", if there is unexpected thing in the prefix
+-- "indent" is appended to expected strings
+tok :: (Default a) => Token -> ParserCtx a -> ParserCtx a
+tok (tokStr :! expStr) ctx@ParserCtx{str=s} = case tokStr >: s of
+    ([], _) -> addExp expStr ctx
+    (pref, newStr) -> move pref newStr ctx
+
+
+-- | Function that check if the prefix of the input contains specific token defined by function
+-- Example: `tok ( isDigit :! "number")` accepts "123", if there is unexpected thing in the prefix
+-- "number" is appended to expected strings
+tokf :: (Default a) => TokenF -> ParserCtx a -> ParserCtx a
+tokf (strFunc :?! expStr) ctx@ParserCtx{str=s} = case strFunc >?: s of
+    ([], _) -> addExp expStr ctx
+    (pref, newStr) -> move pref newStr ctx
 
 
 indent :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
-indent ctx@ParserCtx{pos=p, str=s} = case "  " <?> s of
-    ([], _) -> addExp "indent" ctx
-    (pref, newStr) -> moveHead pref newStr ctx
+indent = tok ("  " :! "indent")
 
-nodeKw :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
-nodeKw ctx@ParserCtx{pos=p, str=s} = case "Node" <?> s of
-    ([], _) -> addExp "Node" ctx
-    (pref, newStr) -> moveHead pref newStr ctx
+-- nodeKw :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
+-- nodeKw ctx@ParserCtx{pos=p, str=s} = <!> "Node" "Node"
 
-leafKw :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
-leafKw ctx@ParserCtx{pos=p, str=s} = case "Leaf" <?> s of
-    ([], _) -> addExp "Leaf" ctx
-    (pref, newStr) -> moveHead pref newStr ctx
+-- leafKw :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
+-- leafKw ctx@ParserCtx{pos=p, str=s} = <!> "Leaf" "Leaf"
 
 -- parse :: [String] -> TreeParserResult
 -- parse ::
