@@ -16,6 +16,9 @@ data BinaryTree a =
     Node a (BinaryTree a) (BinaryTree a) |
     Leaf a
 
+instance Default (BinaryTree a) where
+    defv = Empty
+
 instance (Show a) => Show (BinaryTree a) where
     show tree = showRec 0 tree where
         showRec nestLvl n = case n of
@@ -41,115 +44,147 @@ type BinaryDecisionTree = BinaryTree DecisionData
 --     LeafLine { indent :: Int, className :: String }
 --     deriving (Eq, Show)
 
+
+-- | Data type for storing parsing errors, first member of tuple can be used for custom message
+-- in the second member can be stored expected tokens
 type ParserErr = (String, [String])
 
-type TreeParserResult = Either ParserErr BinaryDecisionTree
 
-data ParserCtx = ParserCtx {
-    pos :: (Int, Int),
-    str :: String,
-    buf :: String,
-    res :: TreeParserResult
+-- | Data type of the result of the parsing (error or result type)
+type ParserResult a = Either ParserErr a
+
+
+-- | Members of class default must have defined the default value (e. g. Empty or something)
+class Default a where
+    defv :: a
+
+-- | Structure that represents parser, it stores context during parsing including the result
+data ParserCtx a = ParserCtx {
+    pos :: (Int, Int), -- Position of the reading head in the input string
+    str :: String, -- Unparsed input string
+    buf :: String, -- Buffer with read input string (it can be cleared if value is not needed)
+    res :: ParserResult a -- The result of parsing 
 } deriving (Show)
 
 
-initParserCtx str = ParserCtx (0,0) str "" (Right $ Empty)
+-- | Initial parserCtx structure
+initParserCtx :: (Default a) => String -> ParserCtx a
+initParserCtx str = ParserCtx (0,0) str "" (Right $ defv)
 
 
-infixr 9 <*.>
-
-infixl 6 <->>
-
-infixl 3 <|>
-
-
-infixr 5 <?>
-
-infixr 5 <??>
-
-infixr 5 <!?>
-
-infixr 5 <!??>
-
-
-skipSpaces :: String -> String
-skipSpaces = snd . span (\c -> isSpace c && (not $ c `elem` "\r\n"))
-
-(<->>) :: (ParserCtx -> ParserCtx) -> (ParserCtx -> ParserCtx) -> (ParserCtx -> ParserCtx)
-(<->>) fl fr = \ctx -> case fl ctx of
-    rctx@ParserCtx{res=(Right _)} -> fr rctx
-    ParserCtx{res=(Left _)} -> fl ctx
-
-
-(<|>) :: (ParserCtx -> ParserCtx) -> (ParserCtx -> ParserCtx) -> (ParserCtx -> ParserCtx)
-(<|>) fl fr = \ctx -> case fl ctx of
-    ParserCtx{res=(Right _)} -> fl ctx
-    lctx@ParserCtx{res=(Left _)} -> fr lctx
-
-
-(<*.>) :: (ParserCtx -> ParserCtx) -> (ParserCtx -> ParserCtx)
-(<*.>) f = \ctx -> case f ctx of
-    rctx@ParserCtx{res=(Right _)} -> ((<*.>) f) rctx
-    ParserCtx{res=(Left _)} -> ctx
-
-(<+.>) :: (ParserCtx -> ParserCtx) -> (ParserCtx -> ParserCtx)
-(<+.>) f = ((<*.>) f) . f
-
-(<!?>) :: String -> String -> (String, String)
-(<!?>) pref str = case stripPrefix pref str of
-    Just newStr -> (pref, newStr) 
-    Nothing -> ("", str)
-
-(<!??>) :: (Char -> Bool) -> String -> (String, String)
-(<!??>) = span
-
-(<?>) :: String -> String -> (String, String)
-(<?>) pref = (<!?>) pref . skipSpaces
-
-(<??>) :: (Char -> Bool) -> String -> (String, String)
-(<??>) f = (<!??>) f . skipSpaces
-
-
+-- | Updates position of the reading head due to the string that has been read
 updatePos :: (Int, Int) -> String -> (Int, Int)
 updatePos p str = foldr (\x (r, c) -> if x == '\n' then (r + 1, 0) else (r, c + 1)) p str
 
 
-clearBuf :: ParserCtx -> ParserCtx
+-- | Clears auxiliary buffer in the parsing context
+clearBuf :: ParserCtx a -> ParserCtx a
 clearBuf ctx = ctx {buf=""}
 
 
-moveHead :: String -> String -> ParserCtx -> ParserCtx
-moveHead readStr newStr ctx@ParserCtx{pos=p, buf=b, str=s, res=(Left _)} = ctx {
+-- | Adds expected token to the error structure
+addExp :: String -> ParserCtx a -> ParserCtx a
+addExp expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", [expStr]))}
+addExp expStr ctx@ParserCtx{res=(Left (msg, exps))} = ctx {res=(Left (msg, expStr:exps))}
+
+
+-- | Updates ParserCtx structure when the correct token is found
+move :: (Default a) => String -> String -> ParserCtx a -> ParserCtx a
+move readStr newStr ctx@ParserCtx{pos=p, buf=b, str=s, res=(Left _)} = ctx {
         pos=(updatePos p readStr),
         buf=(b ++ readStr),
         str=newStr,
-        res=(Right $ Empty)
+        res=(Right $ defv)
     }
-moveHead readStr newStr ctx@ParserCtx{pos=p, buf=b, str=s} = ctx {
+move readStr newStr ctx@ParserCtx{pos=p, buf=b, str=s} = ctx {
         pos=(updatePos p readStr),
         buf=(b ++ readStr),
         str=newStr
     }
 
 
-addExp :: String -> ParserCtx -> ParserCtx
-addExp expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", [expStr]))}
-addExp expStr ctx@ParserCtx{res=(Left (msg, exps))} = ctx {res=(Left (msg, expStr:exps))}
+-- | Shifts prefix that is made by whitespaces
+skipSpaces :: String -> String
+skipSpaces = snd . span (\c -> isSpace c && (not $ c `elem` "\r\n"))
 
 
-indent :: ParserCtx -> ParserCtx
-indent ctx@ParserCtx{pos=p, str=s} = case "  " <!?> s of
+
+-- ------ Functions for creating grammar rules --------
+infixl 6 <->>
+
+-- | Sequence - Example: `parseA <->> parseB` will accept "AB"
+(<->>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<->>) fl fr = \ctx -> case fl ctx of
+    rctx@ParserCtx{res=(Right _)} -> fr rctx
+    ParserCtx{res=(Left _)} -> fl ctx -- If there is an error skip the second parsing function
+
+
+infixl 3 <|>
+
+-- | Alternatives - Example: `parseA <|> parseB` will accept "A" as well as "B"
+(<|>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<|>) fl fr = \ctx -> case fl ctx of
+    ParserCtx{res=(Right _)} -> fl ctx
+    lctx@ParserCtx{res=(Left _)} -> fr lctx -- If there is and error try the second alternative
+
+
+infixr 8 <*.>
+
+-- | Iteration -- Example: `<*.> parseA` will accept "", "A", "AA"...
+(<*.>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<*.>) f = \ctx -> case f ctx of
+    rctx@ParserCtx{res=(Right _)} -> ((<*.>) f) rctx
+    ParserCtx{res=(Left _)} -> ctx -- If there is an error terminate iteration
+
+
+infixr 8 <+.>
+
+-- | Positive iteration -- Example: `<*.> parseA` will accept "A", "AA", "AAA"...
+(<+.>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<+.>) f = ((<*.>) f) . f
+
+
+infixr 9 <-*>
+
+-- | Whitespace skip -- Example: `<-*> parseA` will accept "A", " A", "  A", "\tA"...
+(<-*>) :: (ParserCtx a -> ParserCtx a) -> (ParserCtx a -> ParserCtx a)
+(<-*>) f = \ctx@ParserCtx {str=s} -> f $ ctx {str=(skipSpaces s)}
+
+
+-- ---------------------------------------------------
+
+
+infixr 5 <?>
+
+-- | Strips given prefix and returns it in tuple with the rest of that string
+(<?>) :: String -> String -> (String, String)
+(<?>) pref str = case stripPrefix pref str of
+    Just newStr -> (pref, newStr) 
+    Nothing -> ("", str)
+
+
+infixr 5 <??>
+
+-- | Strips prefix defined by function and returns it in tuple with the rest of that string
+-- Same as span
+(<??>) :: (Char -> Bool) -> String -> (String, String)
+(<??>) = span
+
+
+
+
+indent :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
+indent ctx@ParserCtx{pos=p, str=s} = case "  " <?> s of
     ([], _) -> addExp "indent" ctx
     (pref, newStr) -> moveHead pref newStr ctx
 
-nodeKw :: ParserCtx -> ParserCtx
-nodeKw ctx@ParserCtx{pos=p, str=s} = case "Node" <!?> s of
+nodeKw :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
+nodeKw ctx@ParserCtx{pos=p, str=s} = case "Node" <?> s of
     ([], _) -> addExp "Node" ctx
     (pref, newStr) -> moveHead pref newStr ctx
 
-
-leafKw :: ParserCtx -> ParserCtx
-leafKw ctx@ParserCtx{pos=p, str=s} = case "Leaf" <!?> s of
+leafKw :: ParserCtx (BinaryTree a) -> ParserCtx (BinaryTree a)
+leafKw ctx@ParserCtx{pos=p, str=s} = case "Leaf" <?> s of
     ([], _) -> addExp "Leaf" ctx
     (pref, newStr) -> moveHead pref newStr ctx
 
