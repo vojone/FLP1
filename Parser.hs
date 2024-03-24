@@ -12,17 +12,15 @@ module Parser
     Default(..),
     ParserCtx(..),
     initParserCtx,
-    (<->>),
+    (+++),
     (<|>),
-    (<*.>),
-    (<+.>),
-    (<?.>),
-    (<-*>),
-    Token(..),
-    TokenF(..),
-    tok,
-    tokf,
-    tokf1
+    (<*.),
+    (<+.),
+    (<?.),
+    (<@),
+    (|!),
+    (*|!),
+    (.|!)
 ) where
 
 import Data.Char
@@ -37,11 +35,11 @@ import Data.List
 -- We want to accept strings /\(\d+\+\d+\)/ (for example: "(1+2)" ), so we can define regular
 -- grammar:
 -- ```
--- number = tokf ( isDigit :?! "number")
+-- number = ( isDigit *|! "number")
 -- 
--- op = tok ( "+" :! "+")
+-- op = tok ( "+" |! "+")
 -- 
--- parse = tok ( "(" :! "(") <->> number <->> op <->> number <->> tok ( ")" :! ")")
+-- parse = ( "(" |! "(") +++ number +++ op +++ number +++ ( ")" |! ")")
 -- ```
 --
 -- Then we can parse string "(123+245)":
@@ -77,6 +75,17 @@ type ParserResult a = Either ParserErr a
 -- | Members of class default must have defined the default value (e. g. Empty or something)
 class Default a where
     defv :: a
+
+
+-- Some instances of default (mainly for debugging)
+instance Default Int where
+    defv = 0
+
+instance Default Float where
+    defv = 0.0
+
+instance Default [a] where
+    defv = []
 
 -- | Structure that represents parser, it stores context during parsing including the result
 data ParserCtx a = ParserCtx {
@@ -134,11 +143,11 @@ skipSpaces = snd . span (\c -> isSpace c && (not $ c `elem` "\r\n"))
 
 
 -- ------ Functions for creating grammar rules --------
-infixl 3 <->>
+infixl 3 +++
 
--- | Sequence - Example: `parseA <->> parseB` will accept "AB"
-(<->>) :: ParseFunc a -> ParseFunc a -> ParseFunc a
-fl <->> fr = \ctx -> case fl ctx of
+-- | Sequence - Example: `parseA +++ parseB` will accept "AB"
+(+++) :: ParseFunc a -> ParseFunc a -> ParseFunc a
+fl +++ fr = \ctx -> case fl ctx of
     rctx@ParserCtx{res=(Right _)} -> fr rctx
     ParserCtx{res=(Left _)} -> fl ctx -- If there is an error skip the second parsing function
 
@@ -152,36 +161,36 @@ fl <|> fr = \ctx -> case fl ctx of
     lctx@ParserCtx{res=(Left _)} -> fr lctx -- If there is and error try the second alternative
 
 
-infixr 6 <*.>
+infixr 6 <*.
 
--- | Iteration -- Example: `<*.> parseA` will accept "", "A", "AA"...
-(<*.>) :: ParseFunc a -> ParseFunc a
-(<*.>) f = \ctx -> case f ctx of
-    rctx@ParserCtx{res=(Right _)} -> ((<*.>) f) rctx
+-- | Iteration -- Example: `<*. parseA` will accept "", "A", "AA"...
+(<*.) :: ParseFunc a -> ParseFunc a
+(<*.) f = \ctx -> case f ctx of
+    rctx@ParserCtx{res=(Right _)} -> ((<*.) f) rctx
     ParserCtx{res=(Left _)} -> ctx -- If there is an error terminate iteration
 
 
-infixr 6 <+.>
+infixr 6 <+.
 
--- | Positive iteration -- Example: `<*.> parseA` will accept "A", "AA", "AAA"...
-(<+.>) :: ParseFunc a -> ParseFunc a
-(<+.>) f = ((<*.>) f) . f
+-- | Positive iteration -- Example: `<*. parseA` will accept "A", "AA", "AAA"...
+(<+.) :: ParseFunc a -> ParseFunc a
+(<+.) f = ((<*.) f) . f
 
 
-infixr 6 <?.>
+infixr 6 <?.
 
--- | Optional -- Example: `<?.> parseA <->> parseB` will accept "B", "AB"
-(<?.>) :: ParseFunc a -> ParseFunc a
-(<?.>) f = \ctx -> case f ctx of
+-- | Optional -- Example: `<?. parseA +++ parseB` will accept "B", "AB"
+(<?.) :: ParseFunc a -> ParseFunc a
+(<?.) f = \ctx -> case f ctx of
     rctx@ParserCtx{res=(Right _)} -> rctx
     ParserCtx{res=(Left _)} -> ctx -- If there is an error return the original ctx
 
 
-infixr 5 <-*>
+infixr 5 <@
 
--- | Whitespace skip -- Example: `<-*> parseA` will accept "A", " A", "  A", "\tA"...
-(<-*>) :: ParseFunc a -> ParseFunc a
-(<-*>) f = \ctx@ParserCtx {str=s} -> f $ ctx {str=(skipSpaces s)}
+-- | Whitespace skip -- Example: `<@ parseA` will accept "A", " A", "  A", "\tA"...
+(<@) :: ParseFunc a -> ParseFunc a
+(<@) f = \ctx@ParserCtx {str=s} -> f $ ctx {str=(skipSpaces s)}
 
 
 -- ---------------------------------------------------
@@ -204,37 +213,34 @@ infix 0 >?:
 (>?:) = span
 
 
--- | Data type for token (for more readable definition of grammar rules), the first string
--- is string than is expected in input, the second string is short textual description of expected
--- string for more readable error messages
-infixr 9 :!
-data Token = String :! String
 
+infix 9 |!
 
-infixr 9 :?!
-data TokenF = (Char -> Bool) :?! String
-
--- | Function that check if the prefix of the input contains specific token
+-- | Operator that check if the prefix of the input contains specific token
 -- Example: `tok ("  " :! "indent")` accepts "  ", if there is unexpected thing in the prefix
 -- "indent" is appended to expected strings
-tok :: (Default a) => Token -> ParserCtx a -> ParserCtx a
-tok (tokStr :! expStr) ctx@ParserCtx{str=s} = case tokStr >: s of
+(|!) :: (Default a) => String -> String -> ParserCtx a -> ParserCtx a
+(|!) tokStr expStr ctx@ParserCtx{str=s} = case tokStr >: s of
     ([], _) -> addExp expStr ctx
     (pref, newStr) -> move pref newStr ctx
 
 
--- | Function that check if the prefix of the input contains specific token defined by function
+infix 9 *|!
+
+-- | Operator that check if the prefix of the input contains specific token defined by function
 -- Example: `tok ( isDigit :! "number")` accepts "123", if there is unexpected thing in the prefix
 -- "number" is appended to expected strings
-tokf :: (Default a) => TokenF -> ParserCtx a -> ParserCtx a
-tokf (strFunc :?! expStr) ctx@ParserCtx{str=s} = case strFunc >?: s of
+(*|!) :: (Default a) => (Char -> Bool) -> String -> ParserCtx a -> ParserCtx a
+(*|!) strFunc expStr ctx@ParserCtx{str=s} = case strFunc >?: s of
     ([], _) -> addExp expStr ctx
     (pref, newStr) -> move pref newStr ctx
 
 
--- | Same as tokf, but only one the first from the prefix is accepted
-tokf1 :: (Default a) => TokenF -> ParserCtx a -> ParserCtx a
-tokf1 (_ :?! expStr) ctx@ParserCtx{str=""} = addExp expStr ctx
-tokf1 (strFunc :?! expStr) ctx@ParserCtx{str=(prefChar:s)} = case strFunc >?: [prefChar] of
+infix 9 .|!
+
+-- | Same as *|!, but only one the first from the prefix is accepted
+(.|!) :: (Default a) =>  (Char -> Bool) -> String -> ParserCtx a -> ParserCtx a
+(.|!) _ expStr ctx@ParserCtx{str=""} = addExp expStr ctx
+(.|!) strFunc expStr ctx@ParserCtx{str=(prefChar:s)} = case strFunc >?: [prefChar] of
     ([], _) -> addExp expStr ctx
     (pref, _) -> move pref s ctx
