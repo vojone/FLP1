@@ -154,10 +154,10 @@ fl |> convf = \ctx -> case ctx of
 
 
 -- | Changes the result of the parsing and adds expected token to the error structure
-raiseParserErr :: String -> ParserCtx a -> ParserCtx a
-raiseParserErr "" ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", []))}
-raiseParserErr expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", [expStr]))}
-raiseParserErr expStr ctx = ctx
+raiseParserErr :: String -> String -> ParserCtx a -> ParserCtx a
+raiseParserErr msg "" ctx@ParserCtx{res=(Right _)} = ctx {res=(Left (msg, []))}
+raiseParserErr msg expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left (msg, [expStr]))}
+raiseParserErr _ _ ctx = ctx
 
 
 -- | Updates ParserCtx structure when the correct token is found
@@ -196,14 +196,14 @@ infixl 1 <|>
 
 -- | Alternatives - Example: `parseA <|> parseB` will accept "A" as well as "B"
 (<|>) :: ParseFunc a -> ParseFunc a -> ParseFunc a
-fl <|> fr = \ctx -> case fl ctx{stepcnt=0} of
+fl <|> fr = \ctx -> case fl ctx of
     ParserCtx{res=(Right _)} -> fl ctx
-    lctx@ParserCtx{res=(Left (lmsg, lexp)),stepcnt=lstep} -> case fr ctx{stepcnt=0} of -- If there is an error try the second alternative
+    lctx@ParserCtx{res=(Left (lmsg, lexp)),stepcnt=lstep} -> case fr ctx of -- If there is an error try the second alternative
         ParserCtx{res=(Right _)} -> fr ctx
-        ParserCtx{res=(Left (rmsg, rexp)),stepcnt=rstep} -> case compare rstep lstep of
-            GT -> lctx{res=(Left (show lstep ++ show rstep, rexp)),stepcnt=rstep}
-            LT -> lctx{res=(Left (show lstep ++ show rstep, lexp)),stepcnt=lstep}
-            EQ -> lctx{res=(Left (show lstep ++ show rstep, rexp ++ lexp)),stepcnt=(lstep + rstep)}
+        ParserCtx{res=(Left (rmsg, rexp)),stepcnt=rstep} -> case compare rstep lstep of -- Detemine which alternative came further
+            GT -> lctx{res=(Left (rmsg, rexp)),stepcnt=rstep}
+            LT -> lctx{res=(Left (lmsg, lexp)),stepcnt=lstep}
+            EQ -> lctx{res=(Left (rmsg, lexp ++ rexp)),stepcnt=rstep} -- If both of them were equally sucessful merge expected tokens
 
 
 
@@ -267,7 +267,7 @@ infix 9 |!
 -- "indent" is appended to expected strings
 (|!) :: (Default a) => String -> String -> ParserCtx a -> ParserCtx a
 (|!) tokStr expStr ctx@ParserCtx{str=s} = case tokStr >: s of
-    ([], _) -> raiseParserErr expStr ctx
+    ([], _) -> raiseParserErr "" expStr ctx
     (pref, newStr) -> move pref newStr ctx
 
 
@@ -278,7 +278,7 @@ infix 9 *|!
 -- "number" is appended to expected strings
 (*|!) :: (Default a) => (Char -> Bool) -> String -> ParserCtx a -> ParserCtx a
 (*|!) strFunc expStr ctx@ParserCtx{str=s} = case strFunc >?: s of
-    ([], _) -> raiseParserErr expStr ctx
+    ([], _) -> raiseParserErr "" expStr ctx
     (pref, newStr) -> move pref newStr ctx
 
 
@@ -286,7 +286,7 @@ infix 9 .|!
 
 -- | Same as *|!, but only one the first from the prefix is accepted
 (.|!) :: (Default a) =>  (Char -> Bool) -> String -> ParserCtx a -> ParserCtx a
-(.|!) _ expStr ctx@ParserCtx{str=""} = raiseParserErr expStr ctx
+(.|!) _ expStr ctx@ParserCtx{str=""} = raiseParserErr "" expStr ctx
 (.|!) strFunc expStr ctx@ParserCtx{str=(prefChar:s)} = case strFunc >?: [prefChar] of
-    ([], _) -> raiseParserErr expStr ctx
+    ([], _) -> raiseParserErr "" expStr ctx
     (pref, _) -> move pref s ctx
