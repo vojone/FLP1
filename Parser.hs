@@ -15,6 +15,7 @@ module Parser
     clearb,
     convert,
     convertold,
+    raiseParserErr,
     (|>),
     (+++),
     (<|>),
@@ -97,7 +98,7 @@ data ParserCtx a = ParserCtx {
     str :: String, -- Unparsed input string
     buf :: String, -- Buffer with read input string (it can be cleared if value is not needed)
     res :: ParserResult a, -- The result of parsing 
-    stepcnt :: Int
+    stepcnt :: Int -- Number of succesfully parsed tokens (important for better error msgs)
 } deriving (Show)
 
 
@@ -152,11 +153,11 @@ fl |> convf = \ctx -> case ctx of
 
 
 
--- | Adds expected token to the error structure
-addExp :: String -> ParserCtx a -> ParserCtx a
-addExp "" ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", []))}
-addExp expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", [expStr]))}
-addExp expStr ctx = ctx
+-- | Changes the result of the parsing and adds expected token to the error structure
+raiseParserErr :: String -> ParserCtx a -> ParserCtx a
+raiseParserErr "" ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", []))}
+raiseParserErr expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", [expStr]))}
+raiseParserErr expStr ctx = ctx
 
 
 -- | Updates ParserCtx structure when the correct token is found
@@ -266,7 +267,7 @@ infix 9 |!
 -- "indent" is appended to expected strings
 (|!) :: (Default a) => String -> String -> ParserCtx a -> ParserCtx a
 (|!) tokStr expStr ctx@ParserCtx{str=s} = case tokStr >: s of
-    ([], _) -> addExp expStr ctx
+    ([], _) -> raiseParserErr expStr ctx
     (pref, newStr) -> move pref newStr ctx
 
 
@@ -277,7 +278,7 @@ infix 9 *|!
 -- "number" is appended to expected strings
 (*|!) :: (Default a) => (Char -> Bool) -> String -> ParserCtx a -> ParserCtx a
 (*|!) strFunc expStr ctx@ParserCtx{str=s} = case strFunc >?: s of
-    ([], _) -> addExp expStr ctx
+    ([], _) -> raiseParserErr expStr ctx
     (pref, newStr) -> move pref newStr ctx
 
 
@@ -285,7 +286,7 @@ infix 9 .|!
 
 -- | Same as *|!, but only one the first from the prefix is accepted
 (.|!) :: (Default a) =>  (Char -> Bool) -> String -> ParserCtx a -> ParserCtx a
-(.|!) _ expStr ctx@ParserCtx{str=""} = addExp expStr ctx
+(.|!) _ expStr ctx@ParserCtx{str=""} = raiseParserErr expStr ctx
 (.|!) strFunc expStr ctx@ParserCtx{str=(prefChar:s)} = case strFunc >?: [prefChar] of
-    ([], _) -> addExp expStr ctx
+    ([], _) -> raiseParserErr expStr ctx
     (pref, _) -> move pref s ctx
