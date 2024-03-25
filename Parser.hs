@@ -140,12 +140,14 @@ infixl 3 |>
 
 -- | Converts the result value of the parser to the value of different type, if there is an error
 -- in the context the same context is returned
-(|>) :: (Default a) => ParseFunc a -> (a -> b -> b) -> ParseFunc b
+(|>) :: (Default a, Default b) => ParseFunc a -> (a -> b -> b) -> ParseFunc b
 fl |> convf = \ctx -> case ctx of
-    lctx@ParserCtx{res=(Left old)} -> lctx{res=(Left old)}
-    ParserCtx{pos=p,buf=b,str=s,res=(Right new)} -> case fl $ ParserCtx {pos=p,buf=b,str=s,res=(Right $ defv)} of
-        llctx@ParserCtx{res=(Left old)} -> llctx{res=(Left old)}
-        rctx@ParserCtx{res=(Right old)} -> rctx{res=(Right $ convf old new)}
+    lctx@ParserCtx{pos=p,buf=b,str=s,res=(Left old)} -> case fl $ lctx{res=(Left $ old)} of
+        llctx@ParserCtx{res=(Left new)} -> llctx{res=(Left new)}
+        rrctx@ParserCtx{res=(Right new)} -> rrctx{res=(Right $ convf new defv)}
+    rctx@ParserCtx{pos=p,buf=b,str=s,res=(Right old)} -> case fl $ rctx{res=(Right $ defv)} of
+        llctx@ParserCtx{res=(Left new)} -> llctx{res=(Left new)}
+        rrctx@ParserCtx{res=(Right new)} -> rrctx{res=(Right $ convf new old)}
 
 
 
