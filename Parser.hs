@@ -96,7 +96,8 @@ data ParserCtx a = ParserCtx {
     pos :: (Int, Int), -- Position of the reading head in the input string
     str :: String, -- Unparsed input string
     buf :: String, -- Buffer with read input string (it can be cleared if value is not needed)
-    res :: ParserResult a -- The result of parsing 
+    res :: ParserResult a, -- The result of parsing 
+    stepcnt :: Int
 } deriving (Show)
 
 
@@ -106,7 +107,7 @@ type ParseFunc a = ParserCtx a -> ParserCtx a
 
 -- | Initial parserCtx structure
 initParserCtx :: (Default a) => String -> ParserCtx a
-initParserCtx inputStr = ParserCtx (0,0) inputStr "" (Right $ defv)
+initParserCtx inputStr = ParserCtx (0,0) inputStr "" (Right $ defv) 0
 
 
 -- | Updates position of the reading head due to the string that has been read
@@ -153,8 +154,9 @@ fl |> convf = \ctx -> case ctx of
 
 -- | Adds expected token to the error structure
 addExp :: String -> ParserCtx a -> ParserCtx a
+addExp "" ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", []))}
 addExp expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left ("", [expStr]))}
-addExp expStr ctx@ParserCtx{res=(Left (msg, exps))} = ctx {res=(Left (msg, expStr:exps))}
+addExp expStr ctx = ctx
 
 
 -- | Updates ParserCtx structure when the correct token is found
@@ -165,10 +167,11 @@ move readStr newStr ctx@ParserCtx{pos=p, buf=b, res=(Left _)} = ctx {
         str=newStr,
         res=(Right $ defv)
     }
-move readStr newStr ctx@ParserCtx{pos=p, buf=b} = ctx {
+move readStr newStr ctx@ParserCtx{pos=p, buf=b, stepcnt=s} = ctx {
         pos=(updatePos p readStr),
         buf=(b ++ readStr),
-        str=newStr
+        str=newStr,
+        stepcnt=(s + 1)
     }
 
 
@@ -192,9 +195,15 @@ infixl 1 <|>
 
 -- | Alternatives - Example: `parseA <|> parseB` will accept "A" as well as "B"
 (<|>) :: ParseFunc a -> ParseFunc a -> ParseFunc a
-fl <|> fr = \ctx -> case fl ctx of
+fl <|> fr = \ctx -> case fl ctx{stepcnt=0} of
     ParserCtx{res=(Right _)} -> fl ctx
-    lctx@ParserCtx{res=(Left _)} -> fr lctx -- If there is and error try the second alternative
+    lctx@ParserCtx{res=(Left (lmsg, lexp)),stepcnt=lstep} -> case fr ctx{stepcnt=0} of -- If there is an error try the second alternative
+        ParserCtx{res=(Right _)} -> fr ctx
+        ParserCtx{res=(Left (rmsg, rexp)),stepcnt=rstep} -> case compare rstep lstep of
+            GT -> lctx{res=(Left (show lstep ++ show rstep, rexp)),stepcnt=rstep}
+            LT -> lctx{res=(Left (show lstep ++ show rstep, lexp)),stepcnt=lstep}
+            EQ -> lctx{res=(Left (show lstep ++ show rstep, rexp ++ lexp)),stepcnt=(lstep + rstep)}
+
 
 
 infixr 6 <*.
