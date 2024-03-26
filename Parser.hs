@@ -12,6 +12,7 @@ module Parser
     Default(..),
     ParserCtx(..),
     initParserCtx,
+    lahead,
     clearb,
     convert,
     convertold,
@@ -30,6 +31,7 @@ module Parser
 
 import Data.Char
 import Data.List
+import qualified Data.Set as Set(fromList, toList)
 
 -- | Following functions are framework for creating custom parsers - because there are two
 -- formats in flp-fun project (tree, csv), these functions were created to have better reusability
@@ -138,16 +140,25 @@ convertold convf ctx = case ctx of
     ParserCtx{res=(Right old), buf=s} -> ctx{res=(Right $ convf s old)}
 
 
+-- | lookahead operator - checks the future characters in the string but does not moves the reading
+-- head - can be used for determing the correct alternative from multiple alternatives which have
+-- some collisions 
+lahead :: ParseFunc a -> ParserCtx a -> ParserCtx a
+lahead ftest ctx = case ftest ctx of
+    ParserCtx{res=(Right _)} -> ctx
+    ParserCtx{res=(Left (msg, exp))} -> ctx{res=(Left (msg, exp))}
+
+
 infixl 3 |>
 
 -- | Converts the result value of the parser to the value of different type, if there is an error
 -- in the context the same context is returned
 (|>) :: (Default a, Default b) => ParseFunc a -> (a -> b -> b) -> ParseFunc b
 fl |> convf = \ctx -> case ctx of
-    lctx@ParserCtx{pos=p,buf=b,str=s,res=(Left old)} -> case fl $ lctx{res=(Left $ old)} of
+    lctx@ParserCtx{res=(Left old)} -> case fl $ lctx{res=(Left $ old)} of
         llctx@ParserCtx{res=(Left new)} -> llctx{res=(Left new)}
         rrctx@ParserCtx{res=(Right new)} -> rrctx{res=(Right $ convf new defv)}
-    rctx@ParserCtx{pos=p,buf=b,str=s,res=(Right old)} -> case fl $ rctx{res=(Right $ defv)} of
+    rctx@ParserCtx{res=(Right old)} -> case fl $ rctx{res=(Right $ defv)} of
         llctx@ParserCtx{res=(Left new)} -> llctx{res=(Left new)}
         rrctx@ParserCtx{res=(Right new)} -> rrctx{res=(Right $ convf new old)}
 
@@ -203,8 +214,7 @@ fl <|> fr = \ctx -> case fl ctx of
         ParserCtx{res=(Left (rmsg, rexp)),stepcnt=rstep} -> case compare rstep lstep of -- Detemine which alternative came further
             GT -> lctx{res=(Left (rmsg, rexp)),stepcnt=rstep}
             LT -> lctx{res=(Left (lmsg, lexp)),stepcnt=lstep}
-            EQ -> lctx{res=(Left (rmsg, lexp ++ rexp)),stepcnt=rstep} -- If both of them were equally sucessful merge expected tokens
-
+            EQ -> lctx{res=(Left (rmsg, nd $ lexp ++ rexp)),stepcnt=rstep} -- If both of them were equally sucessful merge expected tokens
 
 
 infixr 6 <*.
@@ -266,6 +276,9 @@ infix 9 |!
 -- Example: `tok ("  " :! "indent")` accepts "  ", if there is unexpected thing in the prefix
 -- "indent" is appended to expected strings
 (|!) :: (Default a) => String -> String -> ParserCtx a -> ParserCtx a
+(|!) "" expStr ctx@ParserCtx{str=s} = case null s of
+    False -> raiseParserErr "" expStr ctx
+    True -> ctx
 (|!) tokStr expStr ctx@ParserCtx{str=s} = case tokStr >: s of
     ([], _) -> raiseParserErr "" expStr ctx
     (pref, newStr) -> move pref newStr ctx
@@ -290,3 +303,8 @@ infix 9 .|!
 (.|!) strFunc expStr ctx@ParserCtx{str=(prefChar:s)} = case strFunc >?: [prefChar] of
     ([], _) -> raiseParserErr "" expStr ctx
     (pref, _) -> move pref s ctx
+
+
+-- | No duplicate function 
+nd :: (Ord a) => [a] -> [a]
+nd = Set.toList . Set.fromList -- This is recommended way of implementation in the learnyouahskell book
