@@ -61,13 +61,13 @@ newlinep = ("\n" |! "newline") <|> ("\r\n" |! "")
 
 -- | Parses classnames
 classnamep :: ParserCtx String -> ParserCtx String
-classnamep = clearb +++ (<?.) (isAlphaNum *|! "classname") +++ convert id
+classnamep = clearb +++ (<?.) ((not . isSpace) *|! "classname") +++ convert id
 
 
 -- | Parses indentation
 indentp :: (Default a) => Int -> ParserCtx a -> ParserCtx a
 indentp 0 ctx = ctx
-indentp n ctx = (("  " |! "indent") +++ indentp (n - 1)) ctx
+indentp n ctx = (replicate (2 * n) ' ' |! "indent") ctx
 
 
 -- | Parses leaf
@@ -82,19 +82,22 @@ nodep :: Int -> ParserCtx BinaryDecisionTree -> ParserCtx BinaryDecisionTree
 nodep lvl = (indentp lvl) +++ ("Node" |! "Node") +++ -- Parses indentation and Node keyword
     (<@) (":" |! ":") +++ (<@) (intp |> (\i d -> d{tindex=i})) +++ -- ":" `feature_index`
     (<@) ("," |! ",") +++ (<@) (floatp |> (\t d -> d{tthreshold=t})) +++ -- "," `float_index`
-    (<+.) newlinep +++
+    (<+.) ((<@) newlinep) +++
     (((nodep $ lvl + 1) <|> (leafp $ lvl + 1)) |> (\t d -> d{tleft=t})) +++ -- Left child
-    (<+.) newlinep +++ 
+    (<+.) ((<@) newlinep) +++ 
     (((nodep $ lvl + 1) <|> (leafp $ lvl + 1)) |> (\t d -> d{tright=t})) -- Right child
     |> buildtree
 
 
 -- | Parses a decision tree
 treep :: ParserCtx BinaryDecisionTree -> ParserCtx BinaryDecisionTree
-treep = ((nodep 0) <|> (leafp 0)) +++ (<*.) newlinep
+treep = ((nodep 0) <|> (leafp 0)) +++ (<*.) ((<@) newlinep)
 
 
 -- | Wrapper above treep
 parse :: String -> ParserResult BinaryDecisionTree
-parse str = res $ treep $ initParserCtx str
+parse inputStr = case treep $ initParserCtx inputStr of
+    ParserCtx{pos=p,res=(Left (_, expects))} -> Left $ 
+        ("Syntax error at " ++ show p ++ ": Expected one of " ++ show expects, expects)
+    ParserCtx{res=r@(Right _)} -> r
 

@@ -6,8 +6,8 @@ module Trainer (
 import Data.Maybe
 import Data.List
 
-import TreeParser
-import DataParser
+import DecisionTree
+import CSVParser
 import Utils
 
 getClasses :: Dataset a -> [String]
@@ -44,8 +44,8 @@ splitDataset objs i thr = fst $ splitDatasetRec (([], []), objs) i thr where
     splitDatasetRec :: (Ord a) => (DatasetSplit a, Dataset a) -> Int -> a -> (DatasetSplit a, Dataset a)
     splitDatasetRec result@(_, []) _ _ = result
     splitDatasetRec ((l, r), o:objs) i thr = case o of
-        Object (DataAttributes a) _ | (a !! i) < thr -> splitDatasetRec ((o:l, r), objs) i thr
-        Object (DataAttributes a) _ | (a !! i) >= thr -> splitDatasetRec ((l, o:r), objs) i thr
+        Object (Attributes a) _ | (a !! i) < thr -> splitDatasetRec ((o:l, r), objs) i thr
+        Object (Attributes a) _ | (a !! i) >= thr -> splitDatasetRec ((l, o:r), objs) i thr
 
 getGiniOfSplit :: DatasetSplit a -> Float
 getGiniOfSplit s@(d1, d2) = ( (toFloat $ length d1) / (toFloat $ totalCnt s))*getGini d1 + 
@@ -61,14 +61,14 @@ findThreshold objs i = foldr (\(t, s, g) (at, as, ag) -> if g < ag then (t, s, g
     findPotentialThresholds = foldr (\x (it, l) -> if it > 0 then (it - 1, (avg x $ ln it):l) else (0, l)) (length vals - 1, []) vals
     avg :: (Fractional a, Ord a) => a -> a -> a
     avg x y = (x + y) / 2 
-    vals = getFeatures i objs
+    vals = getAttrs i objs
     ln it = vals !! (it - 1)
 
 getBestSplit :: (Fractional a, Ord a) => Dataset a -> (Int, a, DatasetSplit a)
 getBestSplit objs = separateIndexThreshold $ getBestSplit' objs where
     separateIndexThreshold (i, (t, s, _)) = (i, t, s)
-    getBestSplit' objs@((Object (DataAttributes a) _):_) = foldr (\(i, (t, s, g)) (ai, (at, as, ag)) -> if g < ag then (i, (t, s, g)) else (ai, (at, as, ag))) (0, (0.0, ([], []), 1.0)) $ computeGinis objs
-    computeGinis objs@((Object (DataAttributes a) _):_) = map (\i -> (i, findThreshold objs i)) [0..length a - 1]
+    getBestSplit' objs@((Object (Attributes a) _):_) = foldr (\(i, (t, s, g)) (ai, (at, as, ag)) -> if g < ag then (i, (t, s, g)) else (ai, (at, as, ag))) (0, (0.0, ([], []), 1.0)) $ computeGinis objs
+    computeGinis objs@((Object (Attributes a) _):_) = map (\i -> (i, findThreshold objs i)) [0..length a - 1]
 
 
 trainTree :: Dataset Float -> BinaryDecisionTree -> BinaryDecisionTree

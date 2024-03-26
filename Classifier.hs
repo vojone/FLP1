@@ -4,8 +4,8 @@ module Classifier
     classifyOne
 ) where
 
-import TreeParser
-import DataParser
+import DecisionTree
+import CSVParser
 
 classify :: BinaryTree DecisionData -> Dataset Float -> Dataset Float
 classify tree = map (classifyOne tree)

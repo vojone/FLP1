@@ -21,6 +21,7 @@ import Data.Maybe
 import Data.Char
 import Text.Read
 import Data.List
+import qualified Data.Set as Set(fromList, toList)
 
 isNewline :: Char -> Bool
 isNewline = flip elem ['\n', '\r'] 
@@ -40,10 +41,8 @@ trim = trimRev . trimRev where
     trimRev :: String -> String
     trimRev = reverse . snd . span isSpace
 
-nd :: (Eq a) => [a] -> [a] 
-nd [] = []
-nd [x] = [x]
-nd (x:remainder) = if elem x remainder then (nd remainder) else x:(nd remainder)
+nd :: (Ord a) => [a] -> [a]
+nd = Set.toList . Set.fromList
 
 append :: a -> [a] -> [a]
 append e [] = [e]

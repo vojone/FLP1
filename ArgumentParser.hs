@@ -112,7 +112,7 @@ parseArgs :: [String] -> ParserResult
 parseArgs [] = configDefault
 parseArgs args =
     let parseArgs' :: (ParserResult, [String]) -> (ParserResult, [String])
-        parseArgs' x@(r, []) = x
+        parseArgs' x@(_, []) = x
         parseArgs' x = parseArgs' $ parseArg x
     in if (elem "-h" args) || (elem "--help" args)
         then Right $ Config Help

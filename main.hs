@@ -1,10 +1,15 @@
+{-
+
+-}
+
 import System.Environment
 import System.IO
 import ArgumentParser
-import TreeParser
-import DataParser
+import BinaryDecisionTreeParser
+import CSVParser
 import Classifier
 import Trainer
+import Parser
 
 
 printHelp :: IO ()
@@ -18,10 +23,15 @@ classifyData treeFilePath dataFilePath = do
     treeFileContents <- hGetContents treeFileHandle
     dataFileHandle <- openFile dataFilePath ReadMode
     dataFileContents <- hGetContents dataFileHandle
-    let tree = parse treeFileContents
-    let newData = parseUnclassifiedData dataFileContents
+    let treeParseResult = parse treeFileContents
 
-    putStrLn $ showStringClasses $ classify tree newData
+    case treeParseResult of
+        Left err -> putStrLn $ fst err
+        Right tree -> do
+            let dataParseResult = parseUnclassifiedData dataFileContents
+            case dataParseResult of
+                Left err -> putStrLn $ fst err
+                Right newdata -> putStrLn $ showClasses $ classify tree newdata
 
     hClose treeFileHandle
     hClose dataFileHandle
@@ -31,11 +41,11 @@ train :: String -> IO ()
 train dataFilePath = do
     dataFileHandle <- openFile dataFilePath ReadMode
     dataFileContents <- hGetContents dataFileHandle
-    let trainData = parseClassifiedData dataFileContents :: Dataset Float
+    -- let trainData = parseClassifiedData dataFileContents :: Dataset Float
 
-    let tree = trainTree trainData Empty
+    -- let tree = trainTree trainData Empty
 
-    putStr $ show tree
+    -- putStr $ show tree
 
     hClose dataFileHandle
 
