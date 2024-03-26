@@ -1,23 +1,24 @@
 BIN_NAME = flp-fun
-SOURCES = Trainer.hs ArgumentParser.hs TreeParser.hs Utils.hs DataParser.hs Classifier.hs Main.hs
+
+SOURCES = Trainer.hs ArgumentParser.hs BinaryDecisionTreeParser.hs Utils.hs\
+	DataParser.hs Classifier.hs Parser.hs DecisionTree.hs Main.hs
+
 INZIP = Makefile README.md $(SOURCES)
+
 ZIP_NAME = xdvora3o.zip
 
-OBJS = $(SOURCES:hs=o)
 
 COMPILER = ghc
-FLAGS = -Wall
+FLAGS = --make -Wall
 
 .PHONY:\
 	zip\
 	clean\
 	hi
 
-%.o: %.hs module_interfaces
-	$(COMPILER) $< -c $(FLAGS)
 
-$(BIN_NAME): $(OBJS)
-	$(COMPILER) $(OBJS) -o $@ $(FLAGS)
+$(BIN_NAME): $(SOURCES)
+	$(COMPILER) $(SOURCES) -o $@ $(FLAGS)
 
 run:
 	$(BIN_NAME)
