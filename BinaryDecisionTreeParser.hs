@@ -14,6 +14,7 @@ module BinaryDecisionTreeParser
 ) where
 
 import Parser
+import CommonParser
 import DecisionTree
 import Data.Char
 
@@ -40,28 +41,6 @@ buildtree :: TempTree -> BinaryDecisionTree -> BinaryDecisionTree
 buildtree TNode{tindex=ti, tthreshold=tt, tleft=tl, tright=tr} _ = Node (Decision ti tt) tl tr
 buildtree TLeaf{tname=tn} _ = Leaf (Class tn)
 
-
--- | Parses float value
-floatp :: ParserCtx Float -> ParserCtx Float
-floatp = clearb +++ rule +++ convert read where
-    rule :: ParserCtx Float -> ParserCtx Float
-    rule = (<?.) ("-" |! "-") +++ (isDigit *|! "digit") +++ -- Integer part
-        (<?.) (("." |! ".") +++ (isDigit *|! "digit")) -- Decimal (optional part)
-
-
--- | Parses int value
-intp :: ParserCtx Int -> ParserCtx Int
-intp = clearb +++ (<?.) ("-" |! "-") +++ (isDigit *|! "digit") +++ convert read
-
-
--- | Parses newline
-newlinep :: (Default a) => ParserCtx a -> ParserCtx a
-newlinep = ("\n" |! "newline") <|> ("\r\n" |! "")
-
-
--- | Parses classnames
-classnamep :: ParserCtx String -> ParserCtx String
-classnamep = clearb +++ (<?.) ((not . isSpace) *|! "classname") +++ convert id
 
 
 -- | Parses indentation

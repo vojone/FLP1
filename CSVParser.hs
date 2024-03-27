@@ -11,8 +11,8 @@ module CSVParser
 ) where
 
 
-import Utils
 import Parser
+import CommonParser
 
 import Data.Char
 
@@ -70,25 +70,7 @@ setClass c d = d{cls=(Just c)}
 
 
 addToDataset :: Object a -> Dataset a -> Dataset a
-addToDataset o d = d ++ [o]  
-
-
--- | Parses float value
-floatp :: ParserCtx Float -> ParserCtx Float
-floatp = clearb +++ rule +++ convert read where
-    rule :: ParserCtx Float -> ParserCtx Float
-    rule = (<?.) ("-" |! "-") +++ (isDigit *|! "digit") +++ -- Integer part
-        (<?.) (("." |! ".") +++ (isDigit *|! "digit")) -- Decimal (optional part)
-
-
--- | Parses classnames
-classnamep :: ParserCtx String -> ParserCtx String
-classnamep = clearb +++ ((not . isSpace) *|! "classname") +++ convert id
-
-
--- | Parses newline
-newlinep :: (Default a) => ParserCtx a -> ParserCtx a
-newlinep = ("\n" |! "newline") <|> ("\r\n" |! "")
+addToDataset o d = d ++ [o]
 
 
 classlessobjectp :: ParserCtx (Object Float) -> ParserCtx (Object Float)
@@ -114,8 +96,8 @@ parseUnclassifiedData inputStr = case classlessdatasetp $ initParserCtx inputStr
 objectp :: ParserCtx (Object Float) -> ParserCtx (Object Float)
 objectp =
     (<@) (floatp |> addValue) +++ 
-    (<+.) ((<@) ("," |! ",") +++ (<@) (classnamep |> setClass) +++ lahead ((<@) (newlinep <|> ("" |! ""))) <|>
-    (<@) ("," |! ",") +++ ((<@) floatp |> addValue))
+    (<+.) ((<@) ("," |! ",") +++ ((<@) floatp |> addValue) +++ lahead ((<@) ("," |! "")) <|>
+    (<@) ("," |! ",") +++ (<@) (classnamep |> setClass))
 
 
 
