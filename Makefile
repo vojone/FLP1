@@ -5,7 +5,7 @@ BIN_NAME = flp-fun
 
 SOURCES = ArgumentParser.hs CommonParser.hs Parser.hs\
 	MData.hs MDataParser.hs Classifier.hs DecisionTree.hs\
-	DecisionTreeParser.hs Main.hs
+	DecisionTreeParser.hs Trainer.hs Main.hs
 
 INZIP = Makefile README.md $(SOURCES)
 
