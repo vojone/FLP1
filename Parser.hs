@@ -161,7 +161,7 @@ convertold convf ctx = case ctx of
 lahead :: ParseFunc a -> ParserCtx a -> ParserCtx a
 lahead ftest ctx = case ftest ctx of
     ParserCtx{res=(Right _)} -> ctx
-    ParserCtx{res=(Left (msg, exp))} -> ctx{res=(Left (msg, exp))}
+    ParserCtx{res=(Left (msg, exps))} -> ctx{res=(Left (msg, exps))}
 
 
 infixl 3 |>

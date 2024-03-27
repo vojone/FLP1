@@ -1,85 +1,170 @@
+{-
+Trainer module
+Module responsible of the traning of new trees
+
+Author: Vojtěch Dvořák (xdvora3o)
+-}
+
 module Trainer (
-    getClasses
+    trainTree
 ) where
 
--- import Data.List
-
--- import DecisionTree
--- import CSVParser
--- import Utils
 
 import MData
+import DecisionTree
 
+import Data.List
 import Data.Maybe
 import qualified Data.Set as Set(fromList, toList)
 
+
+-- | Type for errors, that occur during the training
+type TrainErr = String
+
+
+-- | The type alias for better readability
+type DatasetSplit = (Dataset, Dataset)
+
+
+-- | No duplicates
+nd :: (Ord a) => [a] -> [a]
+nd = Set.toList . Set.fromList
+
+
+-- | Converts integral type to double
+toDouble :: (Integral a) => a -> Double
+toDouble str = fromIntegral str :: Double
+
+
+-- | Converts array of integral values to double values
+toDoubles :: (Integral a) => [a] -> [Double]
+toDoubles = map toDouble
+
+
+-- | Gets the list with all classes of objects in the dataset
 getClasses :: Dataset -> [String]
 getClasses = map getClass . filter (\(Object _ c) -> isJust c) where
     getClass :: Object -> String
     getClass (Object _ (Just c)) = c
     getClass (Object _ _) = ""
 
+
+-- | Removes multiple occurences of the same classes in the return value of getClasses
 getUniqueClasses :: Dataset -> [String]
-getUniqueClasses = Set.toList . Set.fromList . getClasses -- Recommended way how to implemented "no duplicate" in learnyouhaskell book
-
--- cntClassMembers :: String -> Dataset a -> Int
--- cntClassMembers clsName = foldr (incCnter clsName) 0 where
---     incCnter :: String -> Object a -> Int -> Int
---     incCnter clsName  (Object _ cls) acc = case cls of
---         Just c | c == clsName -> acc + 1
---         _ -> acc
-
--- getMostProbableClass :: Dataset a -> String
--- getMostProbableClass objs = fst $ foldr (\c acc -> if fst acc == "" || snd acc < snd c then c else acc) ("", 0) $ map (\c -> (c, cntClassMembers c objs)) $ getUniqueClasses objs
-
--- getGini :: Dataset a -> Float
--- getGini objs = 1 - (sum $ sqProbs (memberCnts objs) (totalCnt objs)) where
---     sqProbs :: [Int] -> Int -> [Float]
---     sqProbs counts total = map (\c -> (c/(toFloat total))^2) (toFloats counts)
---     memberCnts :: Dataset a -> [Int]
---     memberCnts objs = map (\c -> cntClassMembers c objs) $ getUniqueClasses objs
---     totalCnt :: Dataset a -> Int
---     totalCnt = length
-
--- type DatasetSplit a = (Dataset a, Dataset a)
-
--- splitDataset :: (Ord a) => Dataset a -> Int -> a -> DatasetSplit a
--- splitDataset objs i thr = fst $ splitDatasetRec (([], []), objs) i thr where
---     splitDatasetRec :: (Ord a) => (DatasetSplit a, Dataset a) -> Int -> a -> (DatasetSplit a, Dataset a)
---     splitDatasetRec result@(_, []) _ _ = result
---     splitDatasetRec ((l, r), o:objs) i thr = case o of
---         Object (Attributes a) _ | (a !! i) < thr -> splitDatasetRec ((o:l, r), objs) i thr
---         Object (Attributes a) _ | (a !! i) >= thr -> splitDatasetRec ((l, o:r), objs) i thr
-
--- getGiniOfSplit :: DatasetSplit a -> Float
--- getGiniOfSplit s@(d1, d2) = ( (toFloat $ length d1) / (toFloat $ totalCnt s))*getGini d1 + 
---     ((toFloat $ length d2) /(toFloat $ totalCnt s))*getGini d2 where
---     totalCnt :: DatasetSplit a -> Int
---     totalCnt (d1, d2) = length d1 + length d2
+getUniqueClasses = nd . getClasses -- Recommended way how to implemented "no duplicate" in learnyouhaskell book
 
 
--- findThreshold :: (Fractional a, Ord a) => Dataset a -> Int -> (a, DatasetSplit a, Float)
--- findThreshold objs i = foldr (\(t, s, g) (at, as, ag) -> if g < ag then (t, s, g) else (at, as, ag)) (select1 $ ((computeGinis objs i) !! 0), ([], []), 1.0) $ computeGinis objs i where
---     computeGinis objs i = map (\(t, s) -> (t, s, getGiniOfSplit s)) $ createSplits objs i
---     createSplits objs i = map (\t -> (t, splitDataset objs i t)) $ snd findPotentialThresholds 
---     findPotentialThresholds = foldr (\x (it, l) -> if it > 0 then (it - 1, (avg x $ ln it):l) else (0, l)) (length vals - 1, []) vals
---     avg :: (Fractional a, Ord a) => a -> a -> a
---     avg x y = (x + y) / 2 
---     vals = getAttrs i objs
---     ln it = vals !! (it - 1)
-
--- getBestSplit :: (Fractional a, Ord a) => Dataset a -> (Int, a, DatasetSplit a)
--- getBestSplit objs = separateIndexThreshold $ getBestSplit' objs where
---     separateIndexThreshold (i, (t, s, _)) = (i, t, s)
---     getBestSplit' objs@((Object (Attributes a) _):_) = foldr (\(i, (t, s, g)) (ai, (at, as, ag)) -> if g < ag then (i, (t, s, g)) else (ai, (at, as, ag))) (0, (0.0, ([], []), 1.0)) $ computeGinis objs
---     computeGinis objs@((Object (Attributes a) _):_) = map (\i -> (i, findThreshold objs i)) [0..length a - 1]
+-- | Counts class members of the specific class
+cntClassMembers :: String -> Dataset -> Int
+cntClassMembers cname dset = length $ filter (hasClass cname) dset  where
+    hasClass :: String -> Object -> Bool
+    hasClass _ (Object _ Nothing) = False
+    hasClass cname' (Object _ (Just c)) = cname' == c
 
 
--- trainTree :: Dataset Float -> BinaryDecisionTree -> BinaryDecisionTree
--- trainTree [] _ = Empty
--- trainTree objs Empty = buildSubtree objs (getBestSplit objs) where
---     buildSubtree :: Dataset Float -> (Int, Float, DatasetSplit Float) -> BinaryDecisionTree
---     buildSubtree objs@(o:_) (_, _, ([], _)) = Leaf (Class $ getMostProbableClass objs)
---     buildSubtree objs@(o:_) (_, _, (_, [])) = Leaf (Class $ getMostProbableClass objs)
---     buildSubtree objs@(o:_) (index, threshold, (l, r)) = Node (Decision index threshold) (trainTree l Empty) (trainTree r Empty)
--- trainTree _ _ = Empty
+-- | Returns list of tuples, where the first element is class that occurs in the dataset and the
+-- second element of tuple is number of its members 
+cntClassesMembers :: Dataset -> [(String, Int)]
+cntClassesMembers dset = map (\c -> (c, cntClassMembers c dset)) $ getUniqueClasses dset
+
+
+-- | Returns the name of the most probable class in the dataset
+getMostProbableClass :: Dataset -> (String, Int)
+getMostProbableClass dset = foldr storeBigger ("", 0) $ cntClassesMembers dset where
+    storeBigger :: (String, Int) -> (String, Int) -> (String, Int)
+    storeBigger n@(_, cnt) m@(_, cntm) = if cnt > cntm then n else m
+
+
+-- | Computes gini index of the given dataset
+getGini :: Dataset -> Double
+getGini objs = 1 - (sum (sqProbs (classCnts objs) (totalCnt objs))) where
+    sqProbs :: [Int] -> Int -> [Double]
+    sqProbs counts total = map (\c -> (c / (toDouble total))^(2 :: Integer)) (toDoubles counts)
+    classCnts :: Dataset -> [Int]
+    classCnts dset = map (\(_, cnt) -> cnt) $ cntClassesMembers dset
+    totalCnt :: Dataset -> Int
+    totalCnt = length
+
+
+-- | Result type of splitDatasetByDouble
+type SplitRresult = Either TrainErr DatasetSplit
+
+
+-- | Splits dataset by double feature at given index
+splitDatasetByDouble :: Dataset -> Int -> Double -> SplitRresult
+splitDatasetByDouble dset i thr = foldr (chooseDataset i thr) (Right $ ([], [])) dset where
+    chooseDataset :: Int -> Double -> Object -> SplitRresult -> SplitRresult
+    chooseDataset _ _ _ err@(Left _) = err
+    chooseDataset i' thr' o@Object{attrs=(Attributes _)} (Right (dl, dr)) = if getAttr i' o == None
+        then Left $ "Train error: Unable to find attr. with index " ++ show i'
+        else case unpackDouble $ getAttr i' o of
+            Nothing -> Left $ "Train error: Bad type of attr. with index " ++ show i' ++ ", expected double."
+            Just doubleVal -> if doubleVal < thr' then (Right $ (o:dl, dr)) else (Right $ (dl, o:dr))
+
+
+-- | Computes gini index of given split
+getGiniOfSplit :: DatasetSplit -> Double
+getGiniOfSplit s@(dl, dr) = (getWeight dl s) * getGini dl + (getWeight dr s) * getGini dr where
+    getWeight :: Dataset -> DatasetSplit -> Double
+    getWeight dset dsplit = (toDouble (length dset)) / (toDouble (totalCnt dsplit))
+    totalCnt :: DatasetSplit -> Int
+    totalCnt (d1, d2) = length d1 + length d2
+
+
+-- | Chooses the lower value of key, if there is a left value it is alwas returned
+storeLower :: (Ord k) => Either a (k, v) -> Either a (k, v) -> Either a (k, v)
+storeLower _ e@(Left _) = e
+storeLower e@(Left _) _ = e
+storeLower n@(Right (g, _)) m@(Right (mg, _)) = if g < mg then n else m
+
+
+-- | Contains Gini of split, threshold and split itself
+type SplitThresholdResult = Either TrainErr (Double, (Double, DatasetSplit))
+
+
+-- | Find the best threshold for attribute with the given index
+findBestDoubleThreshold :: Dataset -> Int -> SplitThresholdResult
+findBestDoubleThreshold dset i = foldr storeLower initAcc $ findThresholds dset i where
+    initAcc :: SplitThresholdResult
+    initAcc = Right (2.0, (0.0, ([], [])))  -- Value 2 was chosen to be sure that every split will substite initial acc
+    findThresholds :: Dataset -> Int -> [SplitThresholdResult]
+    findThresholds dset' i' = map (createSplitThreshold) computeThresholds where
+        computeThresholds :: [Double] -- Computes all potential thresholds (values in the middle of intervals)
+        computeThresholds = [((x + y) / 2) | (x, y) <- zip getVals (tail getVals)]
+        getVals :: [Double] -- Returns sorted array with values at index i'
+        getVals = sort $ nd $ catMaybes $ map unpackDouble $ getAttrs i' dset'
+        createSplitThreshold :: Double -> SplitThresholdResult
+        createSplitThreshold thr = case splitDatasetByDouble dset' i' thr of
+                Left err -> Left err
+                Right s -> Right $ (getGiniOfSplit s, (thr, s))
+
+
+-- | Return type of best split function
+type BestSplitResult = Either TrainErr (Double, (Int, (Double, DatasetSplit)))
+
+
+-- | Find the best split of the given dataset
+getBestSplit :: Dataset -> BestSplitResult
+getBestSplit dset = foldr storeLower (Right (0.0, (0, (0.0, ([], []))))) $ getSplits dset where
+getSplits :: Dataset -> [BestSplitResult] -- Gets all candidate splits
+getSplits [] = []
+getSplits d@((Object (Attributes a) _):_) = map (getBestSplitAt d) [0..length a - 1] where
+    getBestSplitAt :: Dataset -> Int -> BestSplitResult -- Computes the best threshold for the give nindex
+    getBestSplitAt dset' i = case findBestDoubleThreshold dset' i of
+        Left err -> Left err
+        Right (g, (thr, s)) -> Right $ (g, (i, (thr, s)))
+
+
+-- | Recursively builds a decision tree from the data
+trainTree :: Dataset -> BinaryDecisionTree -> Either TrainErr BinaryDecisionTree
+trainTree [] _ = Right $ Empty
+trainTree dset Empty = buildSTree dset (getBestSplit dset) where
+    buildSTree :: Dataset -> BestSplitResult -> Either TrainErr BinaryDecisionTree
+    buildSTree _ (Left err) = Left $ err
+    buildSTree d (Right (_, (_, (_, (_, []))))) = Right $ Leaf $ Class $ fst $ getMostProbableClass d -- If any part of the split is empty, choose the most probably class
+    buildSTree d (Right (_, (_, (_, ([], _))))) = Right $ Leaf $ Class $ fst $ getMostProbableClass d
+    buildSTree _ (Right (_, (i, (t, (l, r))))) = case (trainTree l Empty, trainTree r Empty) of
+        (Left err, _) -> Left err
+        (_, Left err) -> Left err
+        (Right lchild, Right rchild) -> Right $ Node (Decision i t) lchild rchild -- Else build the node and its child recursively
+trainTree _ _ = Right $ Empty

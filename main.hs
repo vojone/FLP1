@@ -6,9 +6,10 @@ Author: Vojtěch Dvořák (xdvora3o)
 -}
 
 import ArgumentParser
+import DecisionTree
 import DecisionTreeParser
-import MDataParser
 import MData
+import MDataParser
 import Classifier
 import Trainer
 
@@ -50,15 +51,26 @@ classifyData treeFilePath dataFilePath = do
             Right dset -> putStrLn $ showClasses dset 
 
 
+-- | Trains the new decision tree on annotated dataset stored in the file
 train :: String -> IO ()
 train dataFilePath = do
+    -- Open the file
     dataFileHandle <- openFile dataFilePath ReadMode
     dataFileContents <- hGetContents dataFileHandle
-    -- let trainData = parseClassifiedData dataFileContents :: Dataset Float
+    
+    -- Parse training data
+    let dataParseResult = parseClassifiedData dataFileContents
+    
+    -- Process the result
+    case dataParseResult of
+        Left err -> putStrLn $ fst err
+        Right trainData -> do
 
-    -- let tree = trainTree trainData Empty
-
-    -- putStr $ show tree
+            -- Do the training
+            let trainResult = trainTree trainData Empty
+            case trainResult of
+                Left err -> putStrLn $ err
+                Right tree -> putStr $ show tree
 
     hClose dataFileHandle
 

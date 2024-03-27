@@ -16,7 +16,6 @@ module DecisionTreeParser
 import Parser
 import CommonParser
 import DecisionTree
-import Data.Char
 
 
 -- | Structure for storing decision data during parsing, these data are used for building nodes

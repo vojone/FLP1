@@ -12,6 +12,7 @@ module CommonParser
     uintp,
     classnamep,
     newlinep,
+    emptyp,
     finalize
 ) where
 
@@ -60,12 +61,17 @@ newlinep :: (Default a) => ParserCtx a -> ParserCtx a
 newlinep = ("\n" |! "newline") <|> ("\r\n" |! "")
 
 
+-- | Parses nothing - just stub for empty columns in csv format
+emptyp :: (Default a) => ParserCtx a -> ParserCtx a
+emptyp = id
+
+
 -- | Provides conversion from ParserCtx (used inside a parser) to ParserResult
 finalize :: ParserCtx a -> ParserResult a
 finalize ctx = case ctx of
     ParserCtx{pos=p,str=s,res=(Left ("", exps))} -> Left $ ("Syntax error at " ++ show p ++ -- If there is no custom message make one due to expects
         ": Got " ++ takeWhile isNewline s ++ ", expected one of " ++ show exps, exps)
-    ParserCtx{pos=p,res=(Left err@(msg, exps))} -> Left ("Error at " ++ show p ++ -- If there is custom error message preserve it
+    ParserCtx{pos=p,res=(Left (msg, exps))} -> Left ("Error at " ++ show p ++ -- If there is custom error message preserve it
         ": " ++ msg, exps)
     ParserCtx{pos=p,str=s,res=r@(Right _)} -> if null $ dropWhile isSpace s -- Check if there are some unparsed non prinateble whitespaces at the end (for better robustness)
         then r -- Nice, everything OK!
@@ -106,11 +112,6 @@ finalize ctx = case ctx of
 --     splitRemainder :: (String, String) -> [String]
 --     splitRemainder (str, rem) = str:(split delims rem)
 
--- toFloats :: (Integral a) => [a] -> [Float]
--- toFloats = map toFloat
-
--- toFloat :: (Integral a) => a -> Float
--- toFloat str = fromIntegral str :: Float
 
 -- toInt :: String -> Int
 -- toInt str = read str :: Int

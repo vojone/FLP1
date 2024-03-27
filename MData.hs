@@ -16,7 +16,8 @@ module MData
     Dataset,
     getAttr,
     getAttrs,
-    showClasses
+    showClasses,
+    showDataset
 ) where
 
 
@@ -67,7 +68,7 @@ data Attributes = Attributes {
 instance Show Attributes where
     show (Attributes []) = ""
     show (Attributes (v:[])) = show v 
-    show (Attributes (v:rem)) = show v ++ ", " ++ show (Attributes rem)
+    show (Attributes (v:rattrs)) = show v ++ ", " ++ show (Attributes rattrs)
 
 
 -- | Object - all the data in one row in CSV
@@ -91,7 +92,7 @@ instance Default Object where
 type Dataset = [Object]
 
 
--- | Prints dataset in the most readable from
+-- | Prints dataset in the most readable from (mainly for debuggin purposes)
 showDataset :: Dataset -> String
 showDataset dataset = unlines $ (map show dataset)
 
@@ -111,7 +112,7 @@ getAttrs index objs = map (getAttr index) objs
 -- | Returns the class of the object, if object is unclassified, empty string is returned
 showClass :: Object -> String
 showClass (Object _ c) = case c of
-    Just cls -> cls
+    Just cname -> cname
     Nothing -> ""
 
 

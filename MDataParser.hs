@@ -17,8 +17,6 @@ import Parser
 import CommonParser
 import MData
 
-import Data.Char
-
 
 -- | Adds value to the given object
 addValue :: (a -> Val) -> a -> Object -> Object
