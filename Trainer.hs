@@ -6,7 +6,8 @@ Author: Vojtěch Dvořák (xdvora3o)
 -}
 
 module Trainer (
-    trainTree
+    trainTree,
+    getBestSplit,
 ) where
 
 
@@ -145,7 +146,7 @@ type BestSplitResult = Either TrainErr (Double, (Int, (Double, DatasetSplit)))
 
 -- | Find the best split of the given dataset
 getBestSplit :: Dataset -> BestSplitResult
-getBestSplit dset = foldr storeLower (Right (0.0, (0, (0.0, ([], []))))) $ getSplits dset where
+getBestSplit dset = foldr storeLower (Right (2.0, (0, (0.0, ([], []))))) $ getSplits dset where
 getSplits :: Dataset -> [BestSplitResult] -- Gets all candidate splits
 getSplits [] = []
 getSplits d@((Object (Attributes a) _):_) = map (getBestSplitAt d) [0..length a - 1] where
