@@ -37,7 +37,7 @@ instance (Show a) => Show (BinaryTree a) where
 
 -- | Type for storing data that are necessary for making decision in a decision tree
 data DecisionData = 
-    Decision { index :: Int, threshold :: Float } |
+    Decision { index :: Int, threshold :: Double } |
     Class { name :: String }
 
 instance Show DecisionData where

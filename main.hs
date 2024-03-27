@@ -1,5 +1,8 @@
 {-
+Main.hs
+The main body of flp-fun project
 
+Author: Vojtěch Dvořák (xdvora3o)
 -}
 
 import System.Environment

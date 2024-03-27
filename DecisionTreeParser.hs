@@ -1,14 +1,14 @@
 {- | 
-BinaryDecisionTreeParser module
+DecisionTreeParser module
 Module containing implemantion of parser for binary decision trees, parsing is implemented via
 Parser module
 
 Author: Vojtěch Dvořák (xdvora3o) 
 -}
 
-module BinaryDecisionTreeParser
+module DecisionTreeParser
 (
-    parse,
+    parseTree,
     BinaryDecisionTree,
     DecisionData(..)
 ) where
@@ -24,7 +24,7 @@ import Data.Char
 data TempTree = 
     TNode {
         tindex :: Int,
-        tthreshold :: Float,
+        tthreshold :: Double,
         tleft :: BinaryDecisionTree,
         tright :: BinaryDecisionTree
     } |
@@ -59,8 +59,8 @@ leafp lvl = (indentp lvl) +++ ("Leaf" |! "Leaf") +++ -- Parses indentation and L
 -- | Parses node and its child
 nodep :: Int -> ParserCtx BinaryDecisionTree -> ParserCtx BinaryDecisionTree
 nodep lvl = (indentp lvl) +++ ("Node" |! "Node") +++ -- Parses indentation and Node keyword
-    (<@) (":" |! ":") +++ (<@) (intp |> (\i d -> d{tindex=i})) +++ -- ":" `feature_index`
-    (<@) ("," |! ",") +++ (<@) (floatp |> (\t d -> d{tthreshold=t})) +++ -- "," `float_index`
+    (<@) (":" |! ":") +++ (<@) (uintp |> (\i d -> d{tindex=i})) +++ -- ":" `feature_index`
+    (<@) ("," |! ",") +++ (<@) (doublep |> (\t d -> d{tthreshold=t})) +++ -- "," `float_index`
     (<+.) ((<@) newlinep) +++
     (((nodep $ lvl + 1) <|> (leafp $ lvl + 1)) |> (\t d -> d{tleft=t})) +++ -- Left child
     (<+.) ((<@) newlinep) +++ 
@@ -74,9 +74,6 @@ treep = ((nodep 0) <|> (leafp 0)) +++ (<*.) ((<@) newlinep)
 
 
 -- | Wrapper above treep
-parse :: String -> ParserResult BinaryDecisionTree
-parse inputStr = case treep $ initParserCtx inputStr of
-    ParserCtx{pos=p,res=(Left (_, expects))} -> Left $ 
-        ("Syntax error at " ++ show p ++ ": Expected one of " ++ show expects, expects)
-    ParserCtx{res=r@(Right _)} -> r
+parseTree :: String -> ParserResult BinaryDecisionTree
+parseTree inputStr = finalize $ treep $ initParserCtx inputStr
 

@@ -1,6 +1,6 @@
 {- | 
 Parser module
-The framework for creating custom parsers
+General framework for creating custom parsers
 
 Author: Vojtěch Dvořák (xdvora3o) 
 -}
@@ -35,10 +35,10 @@ import qualified Data.Set as Set(fromList, toList)
 
 -- | Following functions are framework for creating custom parsers - because there are two
 -- formats in flp-fun project (tree, csv), these functions were created to have better reusability
--- of the parsing, better exensibility and to be reusable for other projects
--- NOTE: this approach is probably overkill for flp-fun project, but it was fun  
+-- of the parsing, better extensibility and to be reusable for other projects
+-- NOTE: this approach is probably MASSIVE OVERKILL for flp-fun project, but it was at least fun  
 
--- Example of usage:
+-- EXAMPLE:
 -- We want to accept strings /\(\d+\+\d+\)/ (for example: "(1+2)" ), so we can define regular
 -- grammar:
 -- ```
@@ -68,6 +68,9 @@ import qualified Data.Set as Set(fromList, toList)
 -- ```
 -- ParserCtx {pos = (0,5), str = "a456", buf = "(123+", res = Left ("",["number"])}
 -- ```
+--
+-- HOW CAN BE ERRORS DETECTED?
+-- ParserCtx structure has Left value in its res member OR there is some leftover in str member
 
 
 -- | Data type for storing parsing errors, first member of tuple can be used for custom message
@@ -91,8 +94,15 @@ instance Default Int where
 instance Default Float where
     defv = 0.0
 
+instance Default Double where
+    defv = 0.0
+
+instance Default (Maybe a) where
+    defv = Nothing
+
 instance Default [a] where
     defv = []
+
 
 -- | Structure that represents parser, it stores context during parsing including the result
 data ParserCtx a = ParserCtx {
@@ -106,6 +116,11 @@ data ParserCtx a = ParserCtx {
 
 -- | Type for concrete functions that perform the parsing
 type ParseFunc a = ParserCtx a -> ParserCtx a
+
+
+-- | No duplicate function 
+nd :: (Ord a) => [a] -> [a]
+nd = Set.toList . Set.fromList -- This is recommended way of implementation in the learnyouahskell book
 
 
 -- | Initial parserCtx structure
@@ -304,7 +319,3 @@ infix 9 .|!
     ([], _) -> raiseParserErr "" expStr ctx
     (pref, _) -> move pref s ctx
 
-
--- | No duplicate function 
-nd :: (Ord a) => [a] -> [a]
-nd = Set.toList . Set.fromList -- This is recommended way of implementation in the learnyouahskell book

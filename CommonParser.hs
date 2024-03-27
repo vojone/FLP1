@@ -1,13 +1,32 @@
+{-
+CommonParser module
+Contains general functions that are used in tree parser as well as in data parser  
+
+Author: Vojtěch Dvořák (xdvora3o)
+-}
+
 module CommonParser
 (
     floatp,
-    intp,
+    doublep,
+    uintp,
     classnamep,
-    newlinep
+    newlinep,
+    finalize
 ) where
 
 import Data.Char
 import Parser
+
+-- Check if character is (part of) the newline or not
+isNewline :: Char -> Bool
+isNewline = flip elem ['\n', '\r'] 
+
+
+-- Checks whether the character i allowed in classname or not
+isClassnameChar :: Char -> Bool
+isClassnameChar c = not ((isSpace c) || (',' == c))
+
 
 -- | Parses float value
 floatp :: ParserCtx Float -> ParserCtx Float
@@ -17,19 +36,41 @@ floatp = clearb +++ rule +++ convert read where
         (<?.) (("." |! ".") +++ (isDigit *|! "digit")) -- Decimal (optional part)
 
 
--- | Parses int value
-intp :: ParserCtx Int -> ParserCtx Int
-intp = clearb +++ (<?.) ("-" |! "-") +++ (isDigit *|! "digit") +++ convert read
+-- | Parses double value
+doublep :: ParserCtx Double -> ParserCtx Double
+doublep = clearb +++ rule +++ convert read where
+    rule :: ParserCtx Double -> ParserCtx Double
+    rule = (<?.) ("-" |! "-") +++ (isDigit *|! "digit") +++ -- Integer part
+        (<?.) (("." |! ".") +++ (isDigit *|! "digit")) +++ -- Decimal (optional part)
+        (<?.) (("e" |! "e") +++ (<?.) (("+" |! "+") <|> ("-" |! "-")) +++ (isDigit *|! "digit")) -- Exponent (Optional too)
+
+
+-- | Parses unsigned int value
+uintp :: ParserCtx Int -> ParserCtx Int
+uintp = clearb +++ (isDigit *|! "digit") +++ convert read
 
 
 -- | Parses classnames
 classnamep :: ParserCtx String -> ParserCtx String
-classnamep = clearb +++ ((not . isSpace) *|! "classname") +++ convert id
+classnamep = clearb +++ (isClassnameChar *|! "classname") +++ convert id
 
 
 -- | Parses newline
 newlinep :: (Default a) => ParserCtx a -> ParserCtx a
 newlinep = ("\n" |! "newline") <|> ("\r\n" |! "")
+
+
+-- | Provides conversion from ParserCtx (used inside a parser) to ParserResult
+finalize :: ParserCtx a -> ParserResult a
+finalize ctx = case ctx of
+    ParserCtx{pos=p,str=s,res=(Left ("", exps))} -> Left $ ("Syntax error at " ++ show p ++ -- If there is no custom message make one due to expects
+        ": Got " ++ takeWhile isNewline s ++ ", expected one of " ++ show exps, exps)
+    ParserCtx{pos=p,res=(Left err@(msg, exps))} -> Left ("Error at " ++ show p ++ -- If there is custom error message preserve it
+        ": " ++ msg, exps)
+    ParserCtx{pos=p,str=s,res=r@(Right _)} -> if null $ dropWhile isSpace s -- Check if there are some unparsed non prinateble whitespaces at the end (for better robustness)
+        then r -- Nice, everything OK!
+        else Left ("Syntax error at " ++ show p ++
+            ": Unable to parse " ++ takeWhile isNewline s, []) -- If there is something else, return an error
 
 
 -- select1 :: (a, b, c) -> a
