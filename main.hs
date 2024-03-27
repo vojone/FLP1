@@ -5,39 +5,49 @@ The main body of flp-fun project
 Author: Vojtěch Dvořák (xdvora3o)
 -}
 
-import System.Environment
-import System.IO
 import ArgumentParser
-import BinaryDecisionTreeParser
-import CSVParser
+import DecisionTreeParser
+import MDataParser
+import MData
 import Classifier
 import Trainer
-import Parser
+
+import System.Environment
+import System.IO
 
 
+-- | Prints help to stdout
 printHelp :: IO ()
 printHelp = do
     putStrLn "Help TBD!"
 
 
+-- | Classifies data and prints classes to stdout
 classifyData :: String -> String -> IO ()
 classifyData treeFilePath dataFilePath = do
+
+    -- Open files
     treeFileHandle <- openFile treeFilePath ReadMode
     treeFileContents <- hGetContents treeFileHandle
     dataFileHandle <- openFile dataFilePath ReadMode
     dataFileContents <- hGetContents dataFileHandle
-    let treeParseResult = parse treeFileContents
 
-    case treeParseResult of
-        Left err -> putStrLn $ fst err
-        Right tree -> do
-            let dataParseResult = parseUnclassifiedData dataFileContents
-            case dataParseResult of
-                Left err -> putStrLn $ fst err
-                Right newdata -> putStrLn $ showClasses $ classify tree newdata
+    -- Make the parsing job
+    let treeParseResult = parseTree treeFileContents
+    let dataParseResult = parseUnclassifiedData dataFileContents
+
+    -- Handle errors or prints the result if everything was OK
+    case (treeParseResult, dataParseResult) of
+        (Left err, _) -> putStrLn $ fst err
+        (Right _, Left err) -> putStrLn $ fst err
+        (Right tree, Right newdata) -> printClassResult $ classify tree newdata
 
     hClose treeFileHandle
-    hClose dataFileHandle
+    hClose dataFileHandle where
+        printClassResult :: DatasetClassResult -> IO ()
+        printClassResult result = case result of 
+            Left err -> putStrLn err
+            Right dset -> putStrLn $ showClasses dset 
 
 
 train :: String -> IO ()

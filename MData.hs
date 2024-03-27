@@ -8,6 +8,9 @@ Author: Vojtěch Dvořák
 module MData
 (
     Val(..),
+    unpackInt,
+    unpackString,
+    unpackDouble,
     Attributes(..),
     Object(..),
     Dataset,
@@ -34,22 +37,23 @@ instance Show Val where
     show (VDouble v) = show v
 
 
--- | Gets the raw integer, IMPORTANT: if it is not integer, unefined is returned
-unpackInt :: Val -> Int
-unpackInt (VInt v) = v
-unpackInt _ = undefined
+-- | Gets the raw integer
+unpackInt :: Val -> Maybe Int
+unpackInt (VInt v) = Just v
+unpackInt _ = Nothing
 
 
--- | Gets the raw string, IMPORTANT: if it is not string, unefined is returned
-unpackString :: Val -> String
-unpackString (VString v) = v
-unpackString _ = undefined
+-- | Gets the raw string
+unpackString :: Val -> Maybe String
+unpackString (VString v) = Just v
+unpackString _ = Nothing
 
 
--- | Gets the raw string, IMPORTANT: if it is not double, undefined is returned
-unpackDouble :: Val -> Double
-unpackDouble (VDouble v) = v
-unpackDouble _ = undefined
+-- | Gets the raw string
+unpackDouble :: Val -> Maybe Double
+unpackDouble (VDouble v) = Just v
+unpackDouble _ = Nothing
+
 
 instance Default Val where
     defv = None
@@ -75,8 +79,8 @@ data Object = Object {
 instance Show Object where
     show Object{attrs=(Attributes []), cls=Nothing} = ""
     show Object{attrs=(Attributes []), cls=(Just c)} = c
-    show Object{attrs=(Attributes a), cls=Nothing} = show a
-    show Object{attrs=(Attributes a), cls=(Just c)} = show a ++ ", " ++ show c 
+    show Object{attrs=a@(Attributes _), cls=Nothing} = show a
+    show Object{attrs=a@(Attributes _), cls=(Just c)} = show a ++ ", " ++ c 
 
 
 instance Default Object where
@@ -87,9 +91,14 @@ instance Default Object where
 type Dataset = [Object]
 
 
+-- | Prints dataset in the most readable from
+showDataset :: Dataset -> String
+showDataset dataset = unlines $ (map show dataset)
+
+
 -- | Returns attribute value at given index
 getAttr :: Int -> Object -> Val
-getAttr index (Object (Attributes a) _) = if index > length a || index < 0
+getAttr index (Object (Attributes a) _) = if index >= length a || index < 0
     then None
     else a !! index
 

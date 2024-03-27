@@ -61,7 +61,8 @@ objectp =
     (<@) (doublep |> (addValue VDouble)) +++ -- There should be at least one value
     (<*.) (((<@) ("," |! ",") +++ ((<@) doublep |> (addValue VDouble)) +++
     lahead ((<@) ("," |! "")))) +++ -- lahead avoids the last column to be considered as some value
-    (<@) ("," |! ",") +++ (<@) (classnamep |> setClass) -- The Last column is class
+    (<@) ("," |! ",") +++ (<@) (classnamep |> setClass) <|> -- The Last column is class
+    (<@) (classnamep |> setClass)
 
 
 -- Parses dataset with classified objects
