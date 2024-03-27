@@ -4,3 +4,5 @@ flp-fun
 *.zip
 *.tree
 *.csv
+
+public/*

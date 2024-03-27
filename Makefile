@@ -11,6 +11,8 @@ INZIP = Makefile README.md $(SOURCES)
 
 ZIP_NAME = xdvora3o.zip
 
+TEST_ZIP_NAME = public-tests.zip
+
 COMPILER = ghc
 FLAGS = --make -O1 -Wall
 
@@ -18,6 +20,7 @@ FLAGS = --make -O1 -Wall
 	run\
 	prof\
 	zip\
+	test\
 	clean
 
 $(BIN_NAME): $(SOURCES)
@@ -34,5 +37,10 @@ prof:
 zip:
 	zip $(ZIP_NAME) $(INZIP)
 
+test: $(BIN_NAME)
+	unzip $(TEST_ZIP_NAME) && cp $(BIN_NAME) public/$(BIN_NAME) &&\
+	pushd public && python3.10 test_flp.py
+
 clean:
 	rm -f *.o *.hi $(BIN_NAME) $(ZIP_NAME)
+	rm -r public
