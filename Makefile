@@ -1,3 +1,6 @@
+# Makefile for FLP1 project
+# Author: Vojtech Dvorak (xdvora3o)
+
 BIN_NAME = flp-fun
 
 SOURCES = Trainer.hs ArgumentParser.hs BinaryDecisionTreeParser.hs\
@@ -23,8 +26,10 @@ $(BIN_NAME): $(SOURCES)
 run:
 	$(BIN_NAME)
 
+# NOTE: Works only on the Merlin server
 prof:
-	$(COMPILER) $(SOURCES) -prof -fprof-auto -rtsopts $(FLAGS) -o $(BIN_NAME)-prof
+	$(COMPILER) $(SOURCES) -prof -fprof-auto -rtsopts --make -Wall \
+	-o $(BIN_NAME)-prof
 
 zip:
 	zip $(ZIP_NAME) $(INZIP)
