@@ -96,11 +96,10 @@ splitDatasetByDouble :: Dataset -> Int -> Double -> SplitRresult
 splitDatasetByDouble dset i thr = foldr (chooseDataset i thr) (Right $ ([], [])) dset where
     chooseDataset :: Int -> Double -> Object -> SplitRresult -> SplitRresult
     chooseDataset _ _ _ err@(Left _) = err
-    chooseDataset i' thr' o@Object{attrs=(Attributes _)} (Right (dl, dr)) = if getAttr i' o == None
-        then Left $ "Train error: Unable to find attr. with index " ++ show i'
-        else case unpackDouble $ getAttr i' o of
-            Nothing -> Left $ "Train error: Bad type of attr. with index " ++ show i' ++ ", expected double."
-            Just doubleVal -> if doubleVal < thr' then (Right $ (o:dl, dr)) else (Right $ (dl, o:dr))
+    chooseDataset i' thr' o@Object{attrs=(Attributes _)} (Right (dl, dr)) = case getAttr i' o of
+        None -> Left $ "Train error: Unable to find attr. with index " ++ show i'
+        VDouble v -> if v < thr' then (Right $ (o:dl, dr)) else (Right $ (dl, o:dr))
+        _ -> Left $ "Train error: Bad type of attr. with index " ++ show i' ++ ", expected double."
 
 
 -- | Computes gini index of given split

@@ -31,6 +31,7 @@ run:
 	$(BIN_NAME)
 
 # NOTE: Works only on the Merlin server
+# Run with: ./$(BIN_NAME)-prof +RTS -p -RTS
 prof:
 	$(COMPILER) $(SOURCES) -prof -fprof-auto -rtsopts --make -Wall \
 	-o $(BIN_NAME)-prof
@@ -46,4 +47,4 @@ test: $(BIN_NAME) $(TEST_DIR)
 	python3.10 test_flp.py && popd"
 
 clean:
-	rm -f *.o *.hi $(BIN_NAME) $(ZIP_NAME)
+	rm -f *.o *.hi $(BIN_NAME) $(BIN_NAME)-prof $(ZIP_NAME)
