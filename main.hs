@@ -6,12 +6,10 @@ Author: Vojtěch Dvořák (xdvora3o)
 -}
 
 import ArgumentParser
-import DecisionTree
 import DecisionTreeParser
 import MData
 import MDataParser
 import Classifier
-import Trainer
 
 import System.Environment
 import System.IO
@@ -86,13 +84,14 @@ train dataFilePath = do
     -- Process the result
     case dataParseResult of
         Left err -> putStrLnAndDie (fst err) 1
-        Right trainData -> do
+        Right trainData -> putStrLn $ showDataset trainData
+        -- Right trainData -> do
 
-            -- Do the training
-            let trainResult = trainTree trainData Empty
-            case trainResult of
-                Left err -> putStrLnAndDie err 1
-                Right tree -> putStr $ show tree
+        --     -- Do the training
+        --     let trainResult = trainTree trainData Empty
+        --     case trainResult of
+        --         Left err -> putStrLnAndDie err 1
+        --         Right tree -> putStr $ show tree
 
     hClose dataFileHandle
 

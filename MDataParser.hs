@@ -54,8 +54,24 @@ parseUnclassifiedData inputStr = finalize $ classlessdatasetp $ initParserCtx in
 
 
 -- | Parses classified object
-objectp :: ParserCtx Object -> ParserCtx Object
-objectp =
+objectp :: Object -> ParserCtx Object -> ParserCtx Object
+objectp templateobj = columnsvalp templateobj 0 where
+    columnsvalp :: Object -> Int -> ParserCtx Object -> ParserCtx Object
+    columnsvalp o i = (<@) (columnsvalprec o i) +++ (<@) (classnamep |> setClass) -- The Last column is class
+    columnsvalprec :: Object -> Int -> ParserCtx Object -> ParserCtx Object
+    columnsvalprec Object{attrs=(Attributes a)} i' | i' >= length a = id
+    columnsvalprec o' i' = columnvalp o' i' +++ (<@) ("," |! ",") +++ (<@) (columnsvalprec o' (i' + 1))
+    columnvalp :: Object -> Int -> ParserCtx Object -> ParserCtx Object
+    columnvalp o' i' = case getAttr i' o' of
+        None -> id
+        VDouble _ -> (doublep |> (addValue VDouble))
+        VInt _ -> (doublep |> (addValue VDouble))
+        VString _ -> (stringp |> (addValue VString))
+
+
+-- | Parses the first row in CSV with classified data
+headobjectp :: ParserCtx Object -> ParserCtx Object
+headobjectp =
     (<@) (doublep |> (addValue VDouble)) +++ -- There should be at least one value
     (<*.) (((<@) ("," |! ",") +++ ((<@) doublep |> (addValue VDouble)) +++
     lahead ((<@) ("," |! "")))) +++ -- lahead avoids the last column to be considered as some value
@@ -63,11 +79,11 @@ objectp =
     (<@) (classnamep |> setClass)
 
 
--- Parses dataset with classified objects
+-- | Parses dataset with classified objects
 datasetp :: ParserCtx Dataset -> ParserCtx Dataset
-datasetp = (<@) (objectp |> addToDataset) +++
-    (<*.) ((<@) newlinep +++ (objectp |> addToDataset)) +++
-    (<*.) ((<@) newlinep)
+datasetp ctx = case res $ ((<@) (headobjectp) |> addToDataset) ctx of
+    Right [o] -> (((<@) (headobjectp) |> addToDataset) +++ (<*.) ((<+.) ((<@) newlinep) +++ ((objectp o) |> addToDataset)) +++ (<*.) ((<@) newlinep)) ctx
+    _ -> ((<@) (headobjectp) |> addToDataset) ctx
 
 
 -- Parses classified data

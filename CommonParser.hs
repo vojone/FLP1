@@ -10,6 +10,7 @@ module CommonParser
     floatp,
     doublep,
     uintp,
+    stringp,
     classnamep,
     newlinep,
     emptyp,
@@ -18,10 +19,6 @@ module CommonParser
 
 import Data.Char
 import Parser
-
--- Check if character is (part of) the newline or not
-isNewline :: Char -> Bool
-isNewline = flip elem ['\n', '\r'] 
 
 
 -- Checks whether the character i allowed in classname or not
@@ -51,6 +48,14 @@ uintp :: ParserCtx Int -> ParserCtx Int
 uintp = clearb +++ (isDigit *|! "digit") +++ convert read
 
 
+-- | Parses string value
+stringp :: ParserCtx String -> ParserCtx String
+stringp = clearb +++ ("\"" |! "\"") +++
+    (<*.) (((\c -> not $ elem c ['\\', '\"']) .|! "symbol") <|> 
+    ("\\" |! "backslash") +++ ((\_ -> True) .|! "symbol")) +++
+    ("\"" |! "\"") +++ convert read
+
+
 -- | Parses classnames
 classnamep :: ParserCtx String -> ParserCtx String
 classnamep = clearb +++ (isClassnameChar *|! "classname") +++ convert id
@@ -68,14 +73,19 @@ emptyp = id
 
 -- | Provides conversion from ParserCtx (used inside a parser) to ParserResult
 finalize :: ParserCtx a -> ParserResult a
-finalize ctx = case ctx of
-    ParserCtx{pos=p,str=s,res=(Left ("", exps))} -> Left $ ("Syntax error at " ++ show p ++ -- If there is no custom message make one due to expects
-        ": Got " ++ takeWhile isNewline s ++ ", expected one of " ++ show exps, exps)
-    ParserCtx{pos=p,res=(Left (msg, exps))} -> Left ("Error at " ++ show p ++ -- If there is custom error message preserve it
-        ": " ++ msg, exps)
-    ParserCtx{pos=p,str=s,res=r@(Right _)} -> if null $ dropWhile isSpace s -- Check if there are some unparsed non prinateble whitespaces at the end (for better robustness)
-        then r -- Nice, everything OK!
-        else Left ("Syntax error at " ++ show p ++
-            ": Unable to parse \"" ++ takeWhile (not . isSpace) s ++ "\"", []) -- If there is something else, return an error
-
+finalize ctx = 
+    let showRemStr = takeWhile (not . isSpace)
+        mergeErrq = foldr (\(_, exps) acc -> exps ++ acc) [] 
+    in case ctx of
+        ParserCtx{pos=p,res=(Left ("", exps)),errstr=es} -> Left $ ("Syntax error at " ++ show p ++ -- If there is no custom message make one due to expects
+            ": Got \"" ++ es ++ "\", expected one of " ++ show exps, exps)
+        ParserCtx{pos=p,res=(Left (msg, exps))} -> Left ("Error at " ++ show p ++ -- If there is custom error message preserve it
+            ": " ++ msg, exps)
+        ParserCtx{pos=p,str=s,res=r@(Right _),errq=q,errstr=es} -> if null $ dropWhile isSpace s -- Check if there are some unparsed non prinateble whitespaces at the end (for better robustness)
+            then r -- Nice, everything OK!
+            else if null q -- If there is something else, return an error, check the errq to make better suggestion
+                then Left ("Syntax error at " ++ show p ++
+                    ": Unable to parse \"" ++ showRemStr s ++ "\"", [])
+                else Left ("Syntax error at " ++ show p ++
+                    ": Got \"" ++ es ++ "\" expected one of " ++ show (mergeErrq q), [])
 

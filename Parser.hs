@@ -110,7 +110,9 @@ data ParserCtx a = ParserCtx {
     str :: String, -- Unparsed input string
     buf :: String, -- Buffer with read input string (it can be cleared if value is not needed)
     res :: ParserResult a, -- The result of parsing 
-    stepcnt :: Int -- Number of succesfully parsed tokens (important for better error msgs)
+    stepcnt :: Int, -- Number of succesfully parsed tokens (important for better error msgs)
+    errq :: [ParserErr],
+    errstr :: String
 } deriving (Show)
 
 
@@ -125,7 +127,7 @@ nd = Set.toList . Set.fromList -- This is recommended way of implementation in t
 
 -- | Initial parserCtx structure
 initParserCtx :: (Default a) => String -> ParserCtx a
-initParserCtx inputStr = ParserCtx (0,0) inputStr "" (Right $ defv) 0
+initParserCtx inputStr = ParserCtx (0,0) inputStr "" (Right $ defv) 0 [] ""
 
 
 -- | Updates position of the reading head due to the string that has been read
@@ -178,9 +180,22 @@ fl |> convf = \ctx -> case ctx of
         rrctx@ParserCtx{res=(Right new)} -> rrctx{res=(Right $ convf new old)}
 
 
+-- Check if character is (part of) the newline or not
+isNewline :: Char -> Bool
+isNewline = flip elem ['\n', '\r'] 
+
+
+-- | Returns "remainder" string
+showRemStr :: String -> String
+showRemStr = takeWhile (not . isNewline)
+
 
 -- | Changes the result of the parsing and adds expected token to the error structure
 raiseParserErr :: String -> String -> ParserCtx a -> ParserCtx a
+raiseParserErr msg "" ctx@ParserCtx{res=(Right _),str=s,errstr=""} =
+    ctx {res=(Left (msg, [])),errstr=(showRemStr s)}
+raiseParserErr msg expStr ctx@ParserCtx{res=(Right _),str=s,errstr=""} =
+    ctx {res=(Left (msg, [expStr])),errstr=(showRemStr s)}
 raiseParserErr msg "" ctx@ParserCtx{res=(Right _)} = ctx {res=(Left (msg, []))}
 raiseParserErr msg expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left (msg, [expStr]))}
 raiseParserErr _ _ ctx = ctx
@@ -188,11 +203,12 @@ raiseParserErr _ _ ctx = ctx
 
 -- | Updates ParserCtx structure when the correct token is found
 move :: (Default a) => String -> String -> ParserCtx a -> ParserCtx a
-move readStr newStr ctx@ParserCtx{pos=p, buf=b, res=(Left _)} = ctx {
+move readStr newStr ctx@ParserCtx{pos=p, buf=b, res=(Left err), errq=q} = ctx {
         pos=(updatePos p readStr),
         buf=(b ++ readStr),
         str=newStr,
-        res=(Right $ defv)
+        res=(Right $ defv),
+        errq=(err:q)
     }
 move readStr newStr ctx@ParserCtx{pos=p, buf=b, stepcnt=s} = ctx {
         pos=(updatePos p readStr),
@@ -236,9 +252,11 @@ infixr 6 <*.
 
 -- | Iteration -- Example: `<*. parseA` will accept "", "A", "AA"...
 (<*.) :: ParseFunc a -> ParseFunc a
-(<*.) f = \ctx -> case f ctx of
+(<*.) f = \ctx@ParserCtx{stepcnt=s} -> case f ctx of
     rctx@ParserCtx{res=(Right _)} -> ((<*.) f) rctx
-    ParserCtx{res=(Left _)} -> ctx -- If there is an error terminate iteration
+    ParserCtx{res=(Left err),errq=q,stepcnt=s',errstr=es} -> if s' > s -- If there is an error terminate iteration
+        then ctx{errq=(err:q),errstr=es}
+        else ctx
 
 
 infixr 6 <+.
@@ -252,9 +270,11 @@ infixr 6 <?.
 
 -- | Optional -- Example: `<?. parseA +++ parseB` will accept "B", "AB"
 (<?.) :: ParseFunc a -> ParseFunc a
-(<?.) f = \ctx -> case f ctx of
+(<?.) f = \ctx@ParserCtx{stepcnt=s} -> case f ctx of
     rctx@ParserCtx{res=(Right _)} -> rctx
-    ParserCtx{res=(Left _)} -> ctx -- If there is an error return the original ctx
+    ParserCtx{res=(Left err),errq=q,stepcnt=s',errstr=es} -> if s' > s -- If there is an error return the original ctx
+        then ctx{errq=(err:q),errstr=es}
+        else ctx
 
 
 infixr 5 <@
