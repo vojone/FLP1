@@ -35,17 +35,40 @@ addToDataset o d = d ++ [o]
 
 
 -- | Parses an unclassified object
-classlessobjectp :: ParserCtx Object -> ParserCtx Object
-classlessobjectp =
+classlessheadobjectp :: ParserCtx Object -> ParserCtx Object
+classlessheadobjectp =
     (<@) (doublep |> (addValue VDouble)) +++ -- There should be at least one value
     (<*.) ((<@) ("," |! ",") +++ ((<@) doublep |> (addValue VDouble)))
 
 
--- | Parses dataset of unclassified objects
+-- | Parses a value in one column in CSV also provides check that value type corresponds the
+-- corresponding value in the reference object
+columnvalp :: Object -> Int -> ParserCtx Object -> ParserCtx Object
+columnvalp o i = case getAttr i o of
+    None -> id
+    VDouble _ -> (doublep |> (addValue VDouble))
+    VInt _ -> (doublep |> (addValue VDouble))
+    VString _ -> (stringp |> (addValue VString))
+
+
+-- | Recursively parses columns in CSV except of the first one
+columnsvalprec :: Object -> Int -> ParserCtx Object -> ParserCtx Object
+columnsvalprec Object{attrs=(Attributes a)} i' | i' >= length a = id
+columnsvalprec o i = (<@) ("," |! ",") +++ (<@) (columnvalp o i) +++ (columnsvalprec o (i + 1))
+
+
+-- | Parses classified object
+classlessobjectp :: Object -> ParserCtx Object -> ParserCtx Object
+classlessobjectp refobj = (<@) (columnvalp refobj 0) +++ columnsvalprec refobj 1 where
+
+
+-- | Parses dataset with unclassified objects
 classlessdatasetp :: ParserCtx Dataset -> ParserCtx Dataset
-classlessdatasetp = (<@) (classlessobjectp |> addToDataset) +++
-    (<?.) ((<+.) ((<@) newlinep +++ (classlessobjectp |> addToDataset))) +++
-    (<*.) ((<@) newlinep)
+classlessdatasetp ctx = case res $ ((<@) (classlessheadobjectp) |> addToDataset) ctx of
+    Right [o] -> (((<@) (classlessheadobjectp) |> addToDataset) +++
+        (<?.) ((<+.) ((<@) newlinep +++ ((classlessobjectp o) |> addToDataset))) +++
+        (<*.) ((<@) newlinep)) ctx
+    _ -> ((<@) (classlessheadobjectp) |> addToDataset) ctx
 
 
 -- | Parses unclassified data
@@ -55,18 +78,10 @@ parseUnclassifiedData inputStr = finalize $ classlessdatasetp $ initParserCtx in
 
 -- | Parses classified object
 objectp :: Object -> ParserCtx Object -> ParserCtx Object
-objectp templateobj = columnsvalp templateobj 0 where
+objectp templateobj = (<@) (columnvalp templateobj 0) +++ columnsvalp templateobj 1 where
     columnsvalp :: Object -> Int -> ParserCtx Object -> ParserCtx Object
-    columnsvalp o i = (<@) (columnsvalprec o i) +++ (<@) (classnamep |> setClass) -- The Last column is class
-    columnsvalprec :: Object -> Int -> ParserCtx Object -> ParserCtx Object
-    columnsvalprec Object{attrs=(Attributes a)} i' | i' >= length a = id
-    columnsvalprec o' i' = columnvalp o' i' +++ (<@) ("," |! ",") +++ (<@) (columnsvalprec o' (i' + 1))
-    columnvalp :: Object -> Int -> ParserCtx Object -> ParserCtx Object
-    columnvalp o' i' = case getAttr i' o' of
-        None -> id
-        VDouble _ -> (doublep |> (addValue VDouble))
-        VInt _ -> (doublep |> (addValue VDouble))
-        VString _ -> (stringp |> (addValue VString))
+    columnsvalp o i = columnsvalprec o i +++
+        (<@) ("," |! ",") +++ (<@) (classnamep |> setClass) -- The Last column is class
 
 
 -- | Parses the first row in CSV with classified data
@@ -82,7 +97,9 @@ headobjectp =
 -- | Parses dataset with classified objects
 datasetp :: ParserCtx Dataset -> ParserCtx Dataset
 datasetp ctx = case res $ ((<@) (headobjectp) |> addToDataset) ctx of
-    Right [o] -> (((<@) (headobjectp) |> addToDataset) +++ (<*.) ((<+.) ((<@) newlinep) +++ ((objectp o) |> addToDataset)) +++ (<*.) ((<@) newlinep)) ctx
+    Right [o] -> (((<@) (headobjectp) |> addToDataset) +++
+        (<*.) ((<+.) ((<@) newlinep) +++ ((objectp o) |> addToDataset)) +++
+        (<*.) ((<@) newlinep)) ctx
     _ -> ((<@) (headobjectp) |> addToDataset) ctx
 
 

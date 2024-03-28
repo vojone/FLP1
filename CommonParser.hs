@@ -18,6 +18,7 @@ module CommonParser
 ) where
 
 import Data.Char
+import qualified Data.Set as Set(fromList, toList)
 import Parser
 
 
@@ -75,7 +76,7 @@ emptyp = id
 finalize :: ParserCtx a -> ParserResult a
 finalize ctx = 
     let showRemStr = takeWhile (not . isSpace)
-        mergeErrq = foldr (\(_, exps) acc -> exps ++ acc) [] 
+        mergeErrq = Set.toList . Set.fromList . foldr (\(_, exps) acc -> exps ++ acc) []
     in case ctx of
         ParserCtx{pos=p,res=(Left ("", exps)),errstr=es} -> Left $ ("Syntax error at " ++ show p ++ -- If there is no custom message make one due to expects
             ": Got \"" ++ es ++ "\", expected one of " ++ show exps, exps)

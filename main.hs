@@ -58,8 +58,8 @@ classifyData treeFilePath dataFilePath = do
 
     -- Handle errors or prints the result if everything was OK
     case (treeParseResult, dataParseResult) of
-        (Left err, _) -> putStrLnAndDie (fst err) 1
-        (Right _, Left err) -> putStrLnAndDie (fst err) 1
+        (Left err, _) -> putStrLnAndDie ("Tree parser: " ++ fst err) 1
+        (Right _, Left err) -> putStrLnAndDie ("Data parser: " ++ fst err) 1
         (Right tree, Right newdata) -> printClassResult $ classify tree newdata
 
     hClose treeFileHandle
