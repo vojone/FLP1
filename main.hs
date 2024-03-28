@@ -9,6 +9,8 @@ import ArgumentParser
 import DecisionTreeParser
 import MData
 import MDataParser
+import DecisionTree
+import Trainer
 import Classifier
 
 import System.Environment
@@ -84,14 +86,14 @@ train dataFilePath = do
     -- Process the result
     case dataParseResult of
         Left err -> putStrLnAndDie (fst err) 1
-        Right trainData -> putStrLn $ showDataset trainData
-        -- Right trainData -> do
+        -- Right trainData -> putStrLn $ showDataset trainData -- For debugging
+        Right trainData -> do
 
-        --     -- Do the training
-        --     let trainResult = trainTree trainData Empty
-        --     case trainResult of
-        --         Left err -> putStrLnAndDie err 1
-        --         Right tree -> putStr $ show tree
+            -- Do the training
+            let trainResult = trainTree trainData Empty
+            case trainResult of
+                Left err -> putStrLnAndDie err 1
+                Right tree -> putStr $ show tree
 
     hClose dataFileHandle
 
