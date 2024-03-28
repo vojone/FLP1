@@ -76,48 +76,6 @@ finalize ctx = case ctx of
     ParserCtx{pos=p,str=s,res=r@(Right _)} -> if null $ dropWhile isSpace s -- Check if there are some unparsed non prinateble whitespaces at the end (for better robustness)
         then r -- Nice, everything OK!
         else Left ("Syntax error at " ++ show p ++
-            ": Unable to parse " ++ takeWhile isNewline s, []) -- If there is something else, return an error
+            ": Unable to parse \"" ++ takeWhile (not . isSpace) s ++ "\"", []) -- If there is something else, return an error
 
 
--- select1 :: (a, b, c) -> a
--- select1 (x, _, _) = x
-
--- select2 :: (a, b, c) -> b
--- select2 (_, x, _) = x
-
--- select3 :: (a, b, c) -> c
--- select3 (_, _, x) = x
-
--- trim :: String -> String
--- trim = trimRev . trimRev where
---     trimRev :: String -> String
---     trimRev = reverse . snd . span isSpace
-
--- nd :: (Ord a) => [a] -> [a]
--- nd = Set.toList . Set.fromList
-
--- append :: a -> [a] -> [a]
--- append e [] = [e]
--- append e (x:xs) = x:(append e xs)
-
--- split :: String -> String -> [String]
--- split [] str = [str]
--- split delims [] = []
--- split delims str = splitRemainder $ breakBy delims $ shiftDelim delims str where
---     breakBy :: String -> String -> (String, String)
---     breakBy delims = break (`elem` delims)
---     shiftDelim :: String -> String -> String
---     shiftDelim _ [] = []
---     shiftDelim delims s@(c:rem) = if elem c delims then rem else s
---     splitRemainder :: (String, String) -> [String]
---     splitRemainder (str, rem) = str:(split delims rem)
-
-
--- toInt :: String -> Int
--- toInt str = read str :: Int
-
--- isInt :: String -> Bool
--- isInt str = isJust (readMaybe str :: Maybe Int)
-
--- isFloat :: String -> Bool
--- isFloat str = isJust (readMaybe str :: Maybe Float)
