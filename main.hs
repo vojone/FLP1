@@ -72,7 +72,7 @@ classifyData treeFilePath dataFilePath = do
         printClassResult :: DatasetClassResult -> IO ()
         printClassResult result = case result of 
             Left err -> putStrLnAndDie err 1
-            Right dset -> putStrLn $ showClasses dset
+            Right dset -> putStr $ showClasses dset
 
 
 
@@ -107,7 +107,7 @@ main = do
     args <- getArgs
     let config = parseArgs args
     case config of
-        Left err -> putStrLn $ "Usage error: " ++ err
+        Left err -> putStrLnAndDie ("Usage error: " ++ err) 2
         Right (Config (Classification treeFile dataFile)) -> classifyData treeFile dataFile
         Right (Config (Training dataFile)) -> train dataFile
         _ -> printHelp
