@@ -169,11 +169,13 @@ trainTree dset Empty = buildSTree dset (getBestSplit dset) where
     buildSTree d (Right (_, (_, (_, (_, []))))) = Right $ buildLeaf d -- If any part of the split is empty, choose the most probably class (this situation may occur when two objects have same features but different classes)
     buildSTree d (Right (_, (_, (_, ([], _))))) = Right $ buildLeaf d
     buildSTree _ (Right (g, (i, (t, (l, r))))) | g <= giniTolerance =
-        Right $ Node (Decision i t) (buildLeaf l) (buildLeaf r)
-    buildSTree _ (Right (_, (i, (t, (l, r))))) = case (trainTree l Empty, trainTree r Empty) of
+        if (fst $ getMostProbableClass l) == (fst $ getMostProbableClass r)
+            then Right $ buildLeaf l
+            else Right $ Node (Decision i t) (buildLeaf l) (buildLeaf r)
+    buildSTree _ (Right (_, (i, (t, (l, r))))) = case (trainTree l Empty, trainTree r Empty) of -- Try to build children of the node
         (Left err, _) -> Left err
         (_, Left err) -> Left err
-        (Right lchild, Right rchild) -> Right $ Node (Decision i t) lchild rchild -- Else build the node and its child recursively
+        (Right lchild, Right rchild) -> Right $ Node (Decision i t) lchild rchild -- Else build the node
     buildLeaf :: Dataset -> BinaryDecisionTree
     buildLeaf d = Leaf $ Class $ ((fst $ getMostProbableClass d))
 trainTree _ _ = Right $ Empty

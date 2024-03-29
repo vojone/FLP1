@@ -74,5 +74,5 @@ treep = ((nodep 0) <|> (leafp 0)) +++ (<*.) ((<@) newlinep)
 
 -- | Wrapper above treep
 parseTree :: String -> ParserResult BinaryDecisionTree
-parseTree inputStr = finalize $ treep $ initParserCtx inputStr
+parseTree inputStr = finalize $ treep $ checkemptyinp $ initParserCtx inputStr
 

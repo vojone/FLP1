@@ -22,16 +22,19 @@ import System.Exit
 printHelp :: IO ()
 printHelp = do
     putStrLn "flp-fun:"
-    putStrLn "Tool for classification of data based on binary dec. trees and training new trees"
+    putStrLn "Tool for classification of data based on binary decision trees and training"
+    putStrLn "new trees using annotated data"
     putStrLn ""
     putStrLn "USAGE:"
     putStrLn "./flp-fun {-1 <tree_path> <uncl_data_path>}|{-2 <classified data>}|{-h|--help}"
+    putStrLn ""
     putStrLn "OPTIONS:"
     putStrLn "-1\tClassification - Classifies data in CSV format via given decision tree"
     putStrLn "-2\tTraining - Trains the new tree using the classified data in CSV format"
     putStrLn "-h|--help\tPrints help to stdout."
     putStrLn ""
     putStrLn "Results are printed to stdout."
+    putStrLn ""
     putStrLn "RETURN:"
     putStrLn "1 if some error occured, otherwise 0.\n"
 

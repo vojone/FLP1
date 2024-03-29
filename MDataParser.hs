@@ -73,7 +73,7 @@ classlessdatasetp ctx = case res $ ((<@) (classlessheadobjectp) |> addToDataset)
 
 -- | Parses unclassified data
 parseUnclassifiedData :: String -> ParserResult Dataset
-parseUnclassifiedData inputStr = finalize $ classlessdatasetp $ initParserCtx inputStr
+parseUnclassifiedData inputStr = finalize $ classlessdatasetp $ checkemptyinp $ initParserCtx inputStr
 
 
 -- | Parses classified object
@@ -105,6 +105,6 @@ datasetp ctx = case res $ ((<@) (headobjectp) |> addToDataset) ctx of
 
 -- Parses classified data
 parseClassifiedData :: String -> ParserResult Dataset
-parseClassifiedData inputStr = finalize $ datasetp $ initParserCtx inputStr
+parseClassifiedData inputStr = finalize $ datasetp $ checkemptyinp $ initParserCtx inputStr
 
  

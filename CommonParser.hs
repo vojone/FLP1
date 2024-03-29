@@ -12,6 +12,7 @@ module CommonParser
     uintp,
     stringp,
     classnamep,
+    checkemptyinp,
     newlinep,
     emptyp,
     finalize
@@ -72,6 +73,18 @@ emptyp :: (Default a) => ParserCtx a -> ParserCtx a
 emptyp = id
 
 
+-- | Check if the string is empty (whitespaces are ignored)
+isEmptyStr :: String -> Bool
+isEmptyStr = null . dropWhile isSpace
+
+
+-- | Check if the string in the context is empty or not
+checkemptyinp :: ParserCtx a -> ParserCtx a
+checkemptyinp ctx@ParserCtx{str=s} = if isEmptyStr s
+    then ctx{res=(Left $ ("Empty input string", []))}
+    else ctx
+
+
 -- | Provides conversion from ParserCtx (used inside a parser) to ParserResult
 finalize :: ParserCtx a -> ParserResult a
 finalize ctx = 
@@ -82,7 +95,7 @@ finalize ctx =
             ": Got \"" ++ es ++ "\", expected one of " ++ show exps, exps)
         ParserCtx{pos=p,res=(Left (msg, exps))} -> Left ("Error at " ++ show p ++ -- If there is custom error message preserve it
             ": " ++ msg, exps)
-        ParserCtx{pos=p,str=s,res=r@(Right _),errq=q,errstr=es} -> if null $ dropWhile isSpace s -- Check if there are some unparsed non prinateble whitespaces at the end (for better robustness)
+        ParserCtx{pos=p,str=s,res=r@(Right _),errq=q,errstr=es} -> if isEmptyStr s -- Check if there are some unparsed non prinateble whitespaces at the end (for better robustness)
             then r -- Nice, everything OK!
             else if null q -- If there is something else, return an error, check the errq to make better suggestion
                 then Left ("Syntax error at " ++ show p ++

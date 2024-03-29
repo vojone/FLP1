@@ -2,6 +2,8 @@
 Parser module
 General framework for creating custom parsers
 
+NOTE: this approach is probably MASSIVE OVERKILL for flp-fun project, but it was at least fun
+
 Author: Vojtěch Dvořák (xdvora3o) 
 -}
 
@@ -36,7 +38,6 @@ import qualified Data.Set as Set(fromList, toList)
 -- | Following functions are framework for creating custom parsers - because there are two
 -- formats in flp-fun project (tree, csv), these functions were created to have better reusability
 -- of the parsing, better extensibility and to be reusable for other projects
--- NOTE: this approach is probably MASSIVE OVERKILL for flp-fun project, but it was at least fun  
 
 -- EXAMPLE:
 -- We want to accept strings /\(\d+\+\d+\)/ (for example: "(1+2)" ), so we can define regular
