@@ -19,8 +19,8 @@ import qualified Data.Set as Set(fromList, toList)
 
 
 -- | Tolerance level of zero gini (to avoid comparison with 0.0)
-zeroGiniTolerance :: Double
-zeroGiniTolerance = 1e-8
+giniTolerance :: Double
+giniTolerance = 1e-10
 
 
 -- | Type for errors, that occur during the training
@@ -130,7 +130,7 @@ type SplitThresholdResult = Either TrainErr (Double, (Double, DatasetSplit))
 findBestDoubleThreshold :: Dataset -> Int -> SplitThresholdResult
 findBestDoubleThreshold dset i = foldr storeLower initAcc $ findThresholds dset i where
     initAcc :: SplitThresholdResult
-    initAcc = Right (2.0, (0.0, ([], [])))  -- Value 2 was chosen to be sure that every split will substite initial acc
+    initAcc = Right (10.0, (0.0, ([], [])))  -- Value 10 was chosen to be sure that every split will substite initial acc
     findThresholds :: Dataset -> Int -> [SplitThresholdResult]
     findThresholds d i' = map (createSplitThreshold d i') $ computeThresholds d i' where
     computeThresholds :: Dataset -> Int -> [Double] -- Computes all potential thresholds (values in the middle of intervals)
@@ -149,7 +149,7 @@ type BestSplitResult = Either TrainErr (Double, (Int, (Double, DatasetSplit)))
 
 -- | Find the best split of the given dataset
 getBestSplit :: Dataset -> BestSplitResult
-getBestSplit dset = foldr storeLower (Right (2.0, (0, (0.0, ([], []))))) $ getSplits dset where
+getBestSplit dset = foldr storeLower (Right (10.0, (0, (0.0, ([], []))))) $ getSplits dset where
 getSplits :: Dataset -> [BestSplitResult] -- Gets all candidate splits
 getSplits [] = []
 getSplits d@((Object (Attributes a) _):_) = map (getBestSplitAt d) [0..length a - 1] where
@@ -166,13 +166,14 @@ trainTree [] _ = Right $ Empty
 trainTree dset Empty = buildSTree dset (getBestSplit dset) where
     buildSTree :: Dataset -> BestSplitResult -> Either TrainErr BinaryDecisionTree
     buildSTree _ (Left err) = Left $ err
-    buildSTree d (Right (g, (_, (_, (_, _))))) | g < zeroGiniTolerance = Right $ buildLeaf d
     buildSTree d (Right (_, (_, (_, (_, []))))) = Right $ buildLeaf d -- If any part of the split is empty, choose the most probably class (this situation may occur when two objects have same features but different classes)
     buildSTree d (Right (_, (_, (_, ([], _))))) = Right $ buildLeaf d
+    buildSTree _ (Right (g, (i, (t, (l, r))))) | g <= giniTolerance =
+        Right $ Node (Decision i t) (buildLeaf l) (buildLeaf r)
     buildSTree _ (Right (_, (i, (t, (l, r))))) = case (trainTree l Empty, trainTree r Empty) of
         (Left err, _) -> Left err
         (_, Left err) -> Left err
         (Right lchild, Right rchild) -> Right $ Node (Decision i t) lchild rchild -- Else build the node and its child recursively
     buildLeaf :: Dataset -> BinaryDecisionTree
-    buildLeaf d = Leaf $ Class $ fst $ getMostProbableClass d
+    buildLeaf d = Leaf $ Class $ ((fst $ getMostProbableClass d))
 trainTree _ _ = Right $ Empty
