@@ -192,12 +192,10 @@ showRemStr = takeWhile (not . isNewline)
 
 -- | Changes the result of the parsing and adds expected token to the error structure
 raiseParserErr :: String -> String -> ParserCtx a -> ParserCtx a
-raiseParserErr msg "" ctx@ParserCtx{res=(Right _),str=s,errstr=""} =
+raiseParserErr msg "" ctx@ParserCtx{res=(Right _),str=s} =
     ctx {res=(Left (msg, [])),errstr=(showRemStr s)}
-raiseParserErr msg expStr ctx@ParserCtx{res=(Right _),str=s,errstr=""} =
+raiseParserErr msg expStr ctx@ParserCtx{res=(Right _),str=s} =
     ctx {res=(Left (msg, [expStr])),errstr=(showRemStr s)}
-raiseParserErr msg "" ctx@ParserCtx{res=(Right _)} = ctx {res=(Left (msg, []))}
-raiseParserErr msg expStr ctx@ParserCtx{res=(Right _)} = ctx {res=(Left (msg, [expStr]))}
 raiseParserErr _ _ ctx = ctx
 
 
